@@ -1,0 +1,682 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useDebounce } from "use-debounce";
+import { toast } from "sonner";
+
+import { ControlPanel, type FilterState, type Origin } from "@/components/ControlPanel";
+import { DestinationCard } from "@/components/DestinationCard";
+import { DestinationModal } from "@/components/DestinationModal";
+import { WorldMap } from "@/components/WorldMap";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LayoutGrid, Globe, X, ArrowRight, Plus } from "lucide-react";
+import { Toaster } from "@/components/ui/sonner";
+import { Button } from "@/components/ui/button";
+
+const initialFilters: FilterState = {
+  year: 2025,
+  origin_iso3: "USA",
+  budget_sens: 0.7,
+  comfort: 0.55,
+  supply_need: 0.65,
+  risk_pri: 0.75,
+  home_spend: 180,
+  scarcity_k: 0.7,
+};
+
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000"
+).replace(/\/$/, "");
+
+const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
+
+export type RankingRow = {
+  country?: string | null;
+  rank?: number | null;
+  score?: number | null;
+  value_multiplier_relative?: number | null;
+  Score?: number | null;
+  est_daily_cost?: number | null;
+  score_infra?: number | null;
+  score_safety?: number | null;
+  wgi_political_stability?: number | null;
+  intl_arrivals?: number | null;
+  iso3?: string | null;
+};
+
+const countryKey = (country: RankingRow) =>
+  country.iso3 ?? country.country ?? "unknown";
+
+const formatMetric = (value: number | null | undefined, suffix = "") => {
+  if (value == null || !Number.isFinite(value)) return "N/A";
+  return `${value.toFixed(2)}${suffix}`;
+};
+
+const formatVisitors = (value: number | null | undefined) => {
+  if (value == null || !Number.isFinite(value)) return "N/A";
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `${Math.round(value / 1000)}K`;
+  return `${Math.round(value)}`;
+};
+
+async function fetchRankings(filters: FilterState, signal?: AbortSignal) {
+  const payload = {
+    year: filters.year,
+    origin_iso3: filters.origin_iso3,
+    budget_sens: filters.budget_sens,
+    comfort: filters.comfort,
+    supply_need: filters.supply_need,
+    risk_pri: filters.risk_pri,
+    scarcity_k: filters.scarcity_k,
+    user_base_spend: filters.home_spend,
+  };
+
+  const response = await fetch(apiUrl("/api/rankings"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch rankings");
+  }
+
+  return (await response.json()) as RankingRow[];
+}
+
+export default function Home() {
+  const [filters, setFilters] = useState<FilterState>(initialFilters);
+  const [results, setResults] = useState<RankingRow[]>([]);
+  const [origins, setOrigins] = useState<Origin[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [sortBy, setSortBy] = useState<"value" | "cost" | "safety">("value");
+  const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
+  const [debouncedFilters] = useDebounce(filters, 500);
+  const [imageMap, setImageMap] = useState<Record<string, string>>({});
+
+  const [compareList, setCompareList] = useState<RankingRow[]>([]);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<RankingRow | null>(null);
+
+  const currentOrigin = useMemo(() => 
+    origins.find(o => o.code === filters.origin_iso3) || { name: "United States", code: "USA", pp_multiplier: 1.0, currency: "USD" }
+  , [origins, filters.origin_iso3]);
+
+  const currencySymbol = useMemo(() => {
+    try {
+      return (0).toLocaleString("en-US", {
+        style: "currency",
+        currency: currentOrigin.currency,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).replace(/\d/g, "").trim();
+    } catch {
+      return "$";
+    }
+  }, [currentOrigin.currency]);
+
+  useEffect(() => {
+    fetch(apiUrl("/api/origins"))
+      .then(res => res.json())
+      .then(data => setOrigins(data))
+      .catch(() => toast.error("Failed to load country list."));
+  }, []);
+
+  const toggleCompare = (country: RankingRow) => {
+    const key = countryKey(country);
+    const willRemove = compareList.some((c) => countryKey(c) === key);
+    if (willRemove && compareList.length <= 2) {
+      setIsCompareOpen(false);
+    }
+
+    setCompareList((prev) => {
+      const exists = prev.find((c) => countryKey(c) === key);
+      if (exists) {
+        return prev.filter((c) => countryKey(c) !== key);
+      }
+      if (prev.length >= 3) {
+        toast.error("You can compare up to 3 countries at once.");
+        return prev;
+      }
+      return [...prev, country];
+    });
+  };
+
+  const percentileTools = useMemo(() => {
+    const scoreValues = results
+      .map((row) => row.Score ?? row.score ?? null)
+      .filter((val): val is number => typeof val === "number" && Number.isFinite(val))
+      .sort((a, b) => a - b);
+
+    const costValues = results
+      .map((row) => row.est_daily_cost ?? null)
+      .filter((val): val is number => typeof val === "number" && Number.isFinite(val))
+      .sort((a, b) => a - b);
+
+    const getIndex = (value: number, sorted: number[]) => {
+      if (sorted.length === 0) return null;
+      if (sorted.length === 1) return 0;
+      const idx = sorted.findIndex((v) => v >= value);
+      return idx === -1 ? sorted.length - 1 : idx;
+    };
+
+    const getHighIsBetterPercent = (value: number | null, sorted: number[]) => {
+      if (value == null) return null;
+      const idx = getIndex(value, sorted);
+      if (idx == null) return null;
+      if (sorted.length === 1) return 1;
+      return idx / (sorted.length - 1);
+    };
+
+    const getLowIsBetterPercent = (value: number | null, sorted: number[]) => {
+      if (value == null) return null;
+      const idx = getIndex(value, sorted);
+      if (idx == null) return null;
+      if (sorted.length === 1) return 1;
+      return 1 - idx / (sorted.length - 1);
+    };
+
+    return {
+      getScorePercent: (value: number | null) =>
+        getHighIsBetterPercent(value, scoreValues),
+      getCostPercent: (value: number | null) =>
+        getLowIsBetterPercent(value, costValues),
+    };
+  }, [results]);
+
+
+  const sortedResults = useMemo(() => {
+    const items = [...results];
+    if (sortBy === "cost") {
+      items.sort(
+        (a, b) =>
+          (a.est_daily_cost ?? Number.POSITIVE_INFINITY) -
+          (b.est_daily_cost ?? Number.POSITIVE_INFINITY)
+      );
+      return items;
+    }
+    if (sortBy === "safety") {
+      items.sort(
+        (a, b) =>
+          (b.score_safety ?? Number.NEGATIVE_INFINITY) -
+          (a.score_safety ?? Number.NEGATIVE_INFINITY)
+      );
+      return items;
+    }
+    items.sort(
+      (a, b) =>
+        (b.score ?? b.Score ?? Number.NEGATIVE_INFINITY) -
+        (a.score ?? a.Score ?? Number.NEGATIVE_INFINITY)
+    );
+    return items;
+  }, [results, sortBy]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
+    void Promise.resolve().then(() => {
+      if (active) setLoading(true);
+    });
+    fetchRankings(debouncedFilters, controller.signal)
+      .then((data) => {
+        if (!active) return;
+        setResults(data);
+      })
+      .catch((error) => {
+        if (!active || error?.name === "AbortError") return;
+        toast.error("Failed to connect to backend.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [debouncedFilters]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const names = results
+      .map((row) => row.country ?? row.iso3 ?? "")
+      .filter((name) => name && !imageMap[name]);
+
+    if (names.length === 0) return () => controller.abort();
+
+    const fetchImages = async () => {
+      const updates: Record<string, string> = {};
+      for (const name of names) {
+        try {
+          const response = await fetch(
+            `/api/pexels?q=${encodeURIComponent(name)}%20travel`,
+            { signal: controller.signal }
+          );
+          if (!response.ok) continue;
+          const data = (await response.json()) as { url?: string };
+          if (data.url) updates[name] = data.url;
+        } catch (error) {
+          if ((error as { name?: string }).name === "AbortError") break;
+        }
+      }
+      if (Object.keys(updates).length > 0) {
+        setImageMap((prev) => ({ ...prev, ...updates }));
+      }
+    };
+
+    void fetchImages();
+
+    return () => controller.abort();
+  }, [results, imageMap]);
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+      <Toaster theme="dark" />
+      <ControlPanel values={filters} setValues={setFilters} origins={origins} />
+      <main className="min-h-screen ml-80 p-8 pb-24">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
+              Global Rankings
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold text-white">
+              Top Value Destinations
+            </h1>
+          </div>
+          <div className="flex items-center gap-4">
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "map")} className="bg-zinc-950/60 p-1 rounded-lg border border-white/10">
+              <TabsList className="bg-transparent h-8">
+                <TabsTrigger value="grid" className="data-[state=active]:bg-white/10 data-[state=active]:text-white h-full px-3 gap-2 text-[10px] uppercase tracking-widest font-bold">
+                  <LayoutGrid className="h-3.5 w-3.5" /> Grid
+                </TabsTrigger>
+                <TabsTrigger value="map" className="data-[state=active]:bg-white/10 data-[state=active]:text-white h-full px-3 gap-2 text-[10px] uppercase tracking-widest font-bold">
+                  <Globe className="h-3.5 w-3.5" /> Map
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <div className="h-8 w-px bg-white/10" />
+
+            <div className="flex items-center gap-3">
+              <Select
+                value={sortBy}
+                onValueChange={(value) =>
+                  setSortBy(value as "value" | "cost" | "safety")
+                }
+              >
+                <SelectTrigger className="h-10 w-52 border-white/10 bg-zinc-950/60 text-xs uppercase tracking-[0.2em] text-zinc-200">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent className="border-white/10 bg-zinc-950 text-zinc-100">
+                  <SelectItem value="value">Best Value (Default)</SelectItem>
+                  <SelectItem value="cost">Lowest Cost</SelectItem>
+                  <SelectItem value="safety">Safest</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {viewMode === "grid" ? (
+            <motion.div
+              key="grid"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            >
+              {loading
+                ? Array.from({ length: 8 }).map((_, index) => (
+                    <div
+                      key={`skeleton-${index}`}
+                      className="overflow-hidden rounded-xl border border-white/10 bg-white/5"
+                    >
+                      <Skeleton className="aspect-[4/3] w-full bg-white/10" />
+                      <div className="space-y-2 p-4">
+                        <Skeleton className="h-4 w-2/3 bg-white/10" />
+                        <Skeleton className="h-3 w-1/3 bg-white/10" />
+                      </div>
+                    </div>
+                  ))
+                : sortedResults.map((row, index) => {
+                    const name = row.country ?? row.iso3 ?? "Unknown";
+                    const valueScore = row.Score ?? row.score ?? null;
+
+                    const rawCost = row.est_daily_cost;
+                    const cost =
+                      rawCost != null
+                        ? `${currencySymbol}${Math.round(rawCost)} / day`
+                        : "Cost N/A";
+                    const infra = row.score_infra ?? 0;
+                    const safety = row.score_safety ?? 0;
+                    const qualityScore = Math.max(0, Math.min(1, (infra + safety) / 2));
+                    const starRating = Math.max(
+                      1,
+                      Math.min(5, Math.round(qualityScore * 10) / 2)
+                    );
+                    const qualityLabel =
+                      starRating >= 4.5
+                        ? "High Quality"
+                        : starRating >= 3.5
+                          ? "Good Quality"
+                          : starRating >= 2.5
+                            ? "Decent Quality"
+                            : "Low Quality";
+
+                    const scorePercent = percentileTools.getScorePercent(valueScore);
+                    const costPercent = percentileTools.getCostPercent(rawCost ?? null);
+                    const topPercent =
+                      scorePercent != null
+                        ? Math.max(1, Math.round((1 - scorePercent) * 100))
+                        : null;
+                    
+                    const isHighValue = scorePercent != null && scorePercent >= 0.75;
+                    const isLowValue = scorePercent != null && scorePercent <= 0.25;
+                    const isLowCost = costPercent != null && costPercent >= 0.5;
+
+                    const verdict = isHighValue && isLowCost
+                      ? "Hidden Gem"
+                      : isLowValue && isLowCost
+                        ? "Budget Adventure"
+                        : isHighValue && !isLowCost
+                          ? "Standard Luxury"
+                          : isLowValue && !isLowCost
+                            ? "Overpriced"
+                            : "Mixed Value";
+
+                    return (
+                      <DestinationCard
+                        key={`${name}-${index}`}
+                        country={{
+                          name,
+                          valueTopPercent: topPercent,
+                          valueTitle: "Score",
+                          cost,
+                          verdict,
+                          starRating,
+                          qualityLabel,
+                          imageUrl: imageMap[name],
+                          safety: row.score_safety,
+                          infra: row.score_infra,
+                          arrivals: row.intl_arrivals,
+                          purchasingPower: row.value_multiplier_relative,
+                        }}
+                        index={index}
+                        travelStyle="Standard"
+                        onClick={() => setSelectedCountry(row)}
+                      />
+                    );
+                  })}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="map"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              className="w-full"
+            >
+              <WorldMap 
+                results={results} 
+                onCountryClick={(country) => setSelectedCountry(country)} 
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {selectedCountry && (
+          <DestinationModal
+            country={selectedCountry}
+            isOpen={!!selectedCountry}
+            onClose={() => setSelectedCountry(null)}
+            allResults={results}
+            imageUrl={imageMap[selectedCountry.country ?? selectedCountry.iso3 ?? ""]}
+            currencySymbol={currencySymbol}
+            onCompare={toggleCompare}
+            isComparing={compareList.some(c => countryKey(c) === countryKey(selectedCountry))}
+          />
+        )}
+
+        <AnimatePresence>
+          {compareList.length > 0 && (
+            <motion.div
+              initial={{ y: 100 }}
+              animate={{ y: 0 }}
+              exit={{ y: 100 }}
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40"
+            >
+              <div className="bg-zinc-900/90 backdrop-blur-xl border border-white/10 rounded-full px-6 py-3 shadow-2xl flex items-center gap-6">
+                <div className="flex items-center gap-3">
+                  {compareList.map((c) => (
+                    <div key={countryKey(c)} className="relative group">
+                      <div className="w-10 h-10 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-[10px] font-bold text-white overflow-hidden">
+                        {imageMap[c.country ?? c.iso3 ?? ""] ? (
+                          <div
+                            className="h-full w-full bg-cover bg-center"
+                            style={{
+                              backgroundImage: `url(${imageMap[c.country ?? c.iso3 ?? ""]})`,
+                            }}
+                          />
+                        ) : (
+                          c.iso3?.slice(0, 2)
+                        )}
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCompare(c);
+                        }}
+                        className="absolute -top-1 -right-1 bg-zinc-950 border border-white/10 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  ))}
+                  {Array.from({ length: 3 - compareList.length }).map((_, i) => (
+                    <div key={i} className="w-10 h-10 rounded-full border border-dashed border-white/10 flex items-center justify-center text-zinc-600">
+                      <Plus className="h-4 w-4" />
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="h-8 w-px bg-white/10" />
+                
+                <div className="flex items-center gap-4">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">Comparison</span>
+                    <span className="text-xs text-white">{compareList.length} of 3 selected</span>
+                  </div>
+                  <Button 
+                    className="rounded-full bg-emerald-500 hover:bg-emerald-600 text-white h-10 px-6 gap-2"
+                    disabled={compareList.length < 2}
+                    onClick={() => setIsCompareOpen(true)}
+                  >
+                    Compare <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isCompareOpen && compareList.length >= 2 ? (
+            <ComparisonPanel
+              countries={compareList}
+              imageMap={imageMap}
+              currencySymbol={currencySymbol}
+              onClose={() => setIsCompareOpen(false)}
+              onRemove={toggleCompare}
+            />
+          ) : null}
+        </AnimatePresence>
+      </main>
+    </div>
+  );
+}
+
+type ComparisonPanelProps = {
+  countries: RankingRow[];
+  imageMap: Record<string, string>;
+  currencySymbol: string;
+  onClose: () => void;
+  onRemove: (country: RankingRow) => void;
+};
+
+function ComparisonPanel({
+  countries,
+  imageMap,
+  currencySymbol,
+  onClose,
+  onRemove,
+}: ComparisonPanelProps) {
+  const metricRows = [
+    {
+      label: "Value score",
+      getValue: (country: RankingRow) => Math.round(country.Score ?? country.score ?? 0).toString(),
+    },
+    {
+      label: "Daily cost",
+      getValue: (country: RankingRow) =>
+        country.est_daily_cost != null
+          ? `${currencySymbol}${Math.round(country.est_daily_cost)}`
+          : "N/A",
+    },
+    {
+      label: "Value power",
+      getValue: (country: RankingRow) =>
+        formatMetric(country.value_multiplier_relative, "x"),
+    },
+    {
+      label: "Safety",
+      getValue: (country: RankingRow) =>
+        country.score_safety != null ? `${Math.round(country.score_safety * 100)}%` : "N/A",
+    },
+    {
+      label: "Infrastructure",
+      getValue: (country: RankingRow) =>
+        country.score_infra != null ? `${Math.round(country.score_infra * 100)}%` : "N/A",
+    },
+    {
+      label: "Annual visitors",
+      getValue: (country: RankingRow) => formatVisitors(country.intl_arrivals),
+    },
+  ];
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/70 p-4 backdrop-blur-sm sm:items-center"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="w-full max-w-5xl overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl"
+        initial={{ y: 32, scale: 0.98 }}
+        animate={{ y: 0, scale: 1 }}
+        exit={{ y: 32, scale: 0.98 }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
+              Comparison
+            </p>
+            <h2 className="mt-1 text-xl font-semibold text-white">
+              Destination tradeoffs
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-white/10 bg-white/5 p-2 text-zinc-300 transition hover:bg-white/10 hover:text-white"
+            aria-label="Close comparison"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div
+          className="grid"
+          style={{
+            gridTemplateColumns: `minmax(9rem, 0.8fr) repeat(${countries.length}, minmax(0, 1fr))`,
+          }}
+        >
+          <div className="border-b border-white/10 bg-zinc-950/60 p-4 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
+            Metric
+          </div>
+          {countries.map((country) => {
+            const name = country.country ?? country.iso3 ?? "Unknown";
+            const imageUrl = imageMap[name];
+
+            return (
+              <div
+                key={countryKey(country)}
+                className="relative border-b border-l border-white/10 bg-zinc-950/40 p-4"
+              >
+                <button
+                  type="button"
+                  onClick={() => onRemove(country)}
+                  className="absolute right-3 top-3 rounded-full bg-zinc-950/80 p-1 text-zinc-400 transition hover:text-white"
+                  aria-label={`Remove ${name} from comparison`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                <div className="flex items-center gap-3 pr-8">
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/5">
+                    {imageUrl ? (
+                      <div
+                        aria-hidden="true"
+                        className="h-full w-full bg-cover bg-center"
+                        style={{ backgroundImage: `url(${imageUrl})` }}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-zinc-500">
+                        {country.iso3?.slice(0, 2) ?? "--"}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white">{name}</p>
+                    <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+                      {country.iso3 ?? "N/A"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {metricRows.map((row) => (
+            <div className="contents" key={row.label}>
+              <div className="border-b border-white/10 bg-zinc-950/50 p-4 text-xs uppercase tracking-[0.16em] text-zinc-500">
+                {row.label}
+              </div>
+              {countries.map((country) => (
+                <div
+                  key={`${row.label}-${countryKey(country)}`}
+                  className="border-b border-l border-white/10 p-4 text-sm font-medium text-zinc-100"
+                >
+                  {row.getValue(country)}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
