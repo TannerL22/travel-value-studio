@@ -39,6 +39,9 @@ PRICE_STATUS_VALUES = {
 
 DATA_GRANULARITY_VALUES = {
     "survey_category_spend",
+    "average_length_of_stay",
+    "derived_per_day_spend",
+    "summary",
     "item_price",
     "fare_table",
     "provider_quote",
@@ -74,6 +77,51 @@ JAPAN_OFFICIAL_VISITOR_SPEND_REQUIRED_COLUMNS: List[str] = [
     "notes",
 ]
 
+JAPAN_OFFICIAL_LENGTH_OF_STAY_REQUIRED_COLUMNS: List[str] = [
+    "country",
+    "source_name",
+    "source_url",
+    "source_file",
+    "period",
+    "visitor_origin_market",
+    "length_of_stay_days",
+    "stay_basis",
+    "data_granularity",
+    "observation_date",
+    "source_confidence",
+    "notes",
+]
+
+JAPAN_OFFICIAL_VISITOR_SPEND_PER_DAY_REQUIRED_COLUMNS: List[str] = [
+    "country",
+    "period",
+    "visitor_origin_market",
+    "spend_category",
+    "spend_value_local_per_trip",
+    "length_of_stay_days",
+    "spend_value_local_per_day",
+    "local_currency",
+    "spend_basis",
+    "data_granularity",
+    "source_name",
+    "source_url",
+    "source_file",
+    "source_confidence",
+    "notes",
+]
+
+JAPAN_OFFICIAL_VISITOR_SPEND_SUMMARY_REQUIRED_COLUMNS: List[str] = [
+    "visitor_origin_market",
+    "total_spend_per_trip_jpy",
+    "length_of_stay_days",
+    "total_spend_per_day_jpy",
+    "accommodation_per_day_jpy",
+    "food_drink_per_day_jpy",
+    "local_transport_per_day_jpy",
+    "shopping_per_day_jpy",
+    "notes",
+]
+
 
 def _read_csv(path: str | Path) -> pd.DataFrame:
     resolved = Path(path)
@@ -103,6 +151,20 @@ def _validate_allowed_values(
         raise ValueError(
             f"{label} has invalid {column} values: {', '.join(invalid)}"
         )
+
+
+def _validate_non_negative_numeric(df: pd.DataFrame, columns: List[str], label: str) -> None:
+    for column in columns:
+        values = pd.to_numeric(df[column], errors="coerce")
+        populated = df[column].astype(str).str.strip() != ""
+        invalid = populated & values.isna()
+        if invalid.any():
+            rows = ", ".join(str(i + 2) for i in df.index[invalid])
+            raise ValueError(f"{label} has non-numeric {column} values (CSV rows: {rows})")
+        negative = populated & (values < 0)
+        if negative.any():
+            rows = ", ".join(str(i + 2) for i in df.index[negative])
+            raise ValueError(f"{label} has negative {column} values (CSV rows: {rows})")
 
 
 def validate_basket_template(path: str | Path) -> pd.DataFrame:
@@ -157,5 +219,72 @@ def validate_japan_official_visitor_spend(path: str | Path) -> pd.DataFrame:
         "data_granularity",
         DATA_GRANULARITY_VALUES,
         "Japan official visitor spend",
+    )
+    return df
+
+
+def validate_japan_official_length_of_stay(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        JAPAN_OFFICIAL_LENGTH_OF_STAY_REQUIRED_COLUMNS,
+        "Japan official length of stay",
+    )
+    _validate_allowed_values(
+        df,
+        "data_granularity",
+        DATA_GRANULARITY_VALUES,
+        "Japan official length of stay",
+    )
+    _validate_non_negative_numeric(
+        df, ["length_of_stay_days"], "Japan official length of stay"
+    )
+    return df
+
+
+def validate_japan_official_visitor_spend_per_day(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        JAPAN_OFFICIAL_VISITOR_SPEND_PER_DAY_REQUIRED_COLUMNS,
+        "Japan official visitor spend per day",
+    )
+    _validate_allowed_values(
+        df,
+        "data_granularity",
+        DATA_GRANULARITY_VALUES,
+        "Japan official visitor spend per day",
+    )
+    _validate_non_negative_numeric(
+        df,
+        [
+            "spend_value_local_per_trip",
+            "length_of_stay_days",
+            "spend_value_local_per_day",
+        ],
+        "Japan official visitor spend per day",
+    )
+    return df
+
+
+def validate_japan_official_visitor_spend_summary(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        JAPAN_OFFICIAL_VISITOR_SPEND_SUMMARY_REQUIRED_COLUMNS,
+        "Japan official visitor spend summary",
+    )
+    _validate_non_negative_numeric(
+        df,
+        [
+            "total_spend_per_trip_jpy",
+            "length_of_stay_days",
+            "total_spend_per_day_jpy",
+            "accommodation_per_day_jpy",
+            "food_drink_per_day_jpy",
+            "local_transport_per_day_jpy",
+            "shopping_per_day_jpy",
+        ],
+        "Japan official visitor spend summary",
     )
     return df

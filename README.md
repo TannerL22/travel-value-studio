@@ -131,10 +131,13 @@ This scaffold does not prove whether Japan or Taiwan is better value yet. It inc
 - `japan_taiwan_basket_template.csv`: tourist-basket rows for accommodation, food/drink, transport, attractions, connectivity, and miscellaneous costs, with explicit placeholder/observed status fields.
 - `japan_taiwan_source_register.csv`: official-source candidates and exact Japan source paths where currently known.
 - `japan_official_visitor_spend.csv`: Japan Tourism Agency Calendar Year 2025 visitor-spend data parsed from the official International Visitor Survey workbook, Annex 2.
+- `japan_official_length_of_stay.csv`: Japan Tourism Agency Calendar Year 2025 average nights parsed from the official workbook, Table 4-1.
+- `japan_official_visitor_spend_per_day.csv`: derived per-day spend estimates where official spend and average-nights origin markets match.
+- `japan_official_visitor_spend_summary.csv`: compact official/derived summary for Total, UK, Taiwan, and United States origin markets.
 - `japan_data_collection_notes.md`: official pages inspected, parsing notes, and remaining Japan data gaps.
 - `validation_schema.py` and `run_validation_checks.py`: lightweight pandas checks for required columns, observed-row source/price fields, and the Japan official spend file when present.
 
-Japan official data collection has started. The first populated official dataset is visitor-spend evidence, not a complete item-level tourist basket. One Tokyo Metro fare-table benchmark is included from the official fare page, while most basket rows remain placeholders. This still does not prove whether Japan or Taiwan is better value; it defines the evidence structure for comparing macro FX/PPP outputs against actual tourist-basket evidence once both country datasets are populated.
+Japan official data collection has started. The first populated official dataset is visitor-spend evidence, not a complete item-level tourist basket. Japan spend now has approximate per-day normalization using official average nights where origin markets match. One Tokyo Metro fare-table benchmark is included from the official fare page, while most basket rows remain placeholders. This still does not prove whether Japan or Taiwan is better value; it defines the evidence structure for comparing macro FX/PPP outputs against actual tourist-basket evidence once both country datasets are populated.
 
 ## Notes
 
