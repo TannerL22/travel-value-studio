@@ -128,11 +128,13 @@ Important limitation: current daily-cost outputs are model estimates derived fro
 This scaffold does not prove whether Japan or Taiwan is better value yet. It includes:
 
 - `japan_taiwan_validation_methodology.md`: validation question, evidence tiers, and falsification criteria.
-- `japan_taiwan_basket_template.csv`: blank tourist-basket rows for accommodation, food/drink, transport, attractions, connectivity, and miscellaneous costs.
-- `japan_taiwan_source_register.csv`: official-source candidates for Japan and Taiwan tourism spend, transport fares, and tourism statistics.
-- `validation_schema.py` and `run_validation_checks.py`: lightweight pandas checks that required columns are present.
+- `japan_taiwan_basket_template.csv`: tourist-basket rows for accommodation, food/drink, transport, attractions, connectivity, and miscellaneous costs, with explicit placeholder/observed status fields.
+- `japan_taiwan_source_register.csv`: official-source candidates and exact Japan source paths where currently known.
+- `japan_official_visitor_spend.csv`: Japan Tourism Agency Calendar Year 2025 visitor-spend data parsed from the official International Visitor Survey workbook, Annex 2.
+- `japan_data_collection_notes.md`: official pages inspected, parsing notes, and remaining Japan data gaps.
+- `validation_schema.py` and `run_validation_checks.py`: lightweight pandas checks for required columns, observed-row source/price fields, and the Japan official spend file when present.
 
-The goal is to compare macro FX/PPP outputs against actual tourist-basket evidence once source-backed prices are collected. Placeholder rows must not be treated as observed prices.
+Japan official data collection has started. The first populated official dataset is visitor-spend evidence, not a complete item-level tourist basket. One Tokyo Metro fare-table benchmark is included from the official fare page, while most basket rows remain placeholders. This still does not prove whether Japan or Taiwan is better value; it defines the evidence structure for comparing macro FX/PPP outputs against actual tourist-basket evidence once both country datasets are populated.
 
 ## Notes
 

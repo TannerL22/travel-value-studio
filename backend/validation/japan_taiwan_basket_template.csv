@@ -1,23 +1,23 @@
-country,city_or_area,basket_category,basket_item,local_price,local_currency,converted_price_usd,converted_price_gbp,source_name,source_url,source_type,source_confidence,observation_date,notes
-Japan,Tokyo,accommodation,3-star hotel night,,,,,,,,official_or_observed,TBD,,placeholder row; do not use until populated with sourced observed price
-Japan,Tokyo,accommodation,hostel/private room,,,,,,,,official_or_observed,TBD,,placeholder row; do not use until populated with sourced observed price
-Japan,Tokyo,food_drink,cheap local meal,,,,,,,,official_or_observed,TBD,,placeholder row; do not use until populated with sourced observed price
-Japan,Tokyo,food_drink,mid-range casual dinner,,,,,,,,official_or_observed,TBD,,placeholder row; do not use until populated with sourced observed price
-Japan,Tokyo,food_drink,coffee,,,,,,,,official_or_observed,TBD,,placeholder row; do not use until populated with sourced observed price
-Japan,Tokyo,local_transport,metro ride,,,,JPY,,,,official,TBD,,candidate source: Tokyo Metro official fare information
-Japan,Tokyo,local_transport,airport transfer,,,,JPY,,,,official,TBD,,candidate source: official rail/bus operator fare
-Japan,Tokyo,intercity_transport,intercity rail benchmark,,,,JPY,,,,official,TBD,,candidate source: JR/Shinkansen official fare reference
-Japan,Tokyo,attractions,museum/attraction entry,,,,JPY,,,,official,TBD,,candidate source: official attraction page
-Japan,Tokyo,connectivity,eSIM/SIM,,,,JPY,,,,official_or_observed,TBD,,placeholder row; do not use until populated with sourced observed price
-Japan,Tokyo,miscellaneous,laundry or convenience item,,,,,,,,official_or_observed,TBD,,placeholder row; do not use until populated with sourced observed price
-Taiwan,Taipei,accommodation,3-star hotel night,,,,,,,,official_or_observed,TBD,,placeholder row; do not use until populated with sourced observed price
-Taiwan,Taipei,accommodation,hostel/private room,,,,,,,,official_or_observed,TBD,,placeholder row; do not use until populated with sourced observed price
-Taiwan,Taipei,food_drink,cheap local meal,,,,,,,,official_or_observed,TBD,,placeholder row; do not use until populated with sourced observed price
-Taiwan,Taipei,food_drink,mid-range casual dinner,,,,,,,,official_or_observed,TBD,,placeholder row; do not use until populated with sourced observed price
-Taiwan,Taipei,food_drink,coffee,,,,,,,,official_or_observed,TBD,,placeholder row; do not use until populated with sourced observed price
-Taiwan,Taipei,local_transport,metro ride,,,,TWD,,,,official,TBD,,candidate source: Taipei Metro official fare information
-Taiwan,Taipei,local_transport,airport transfer,,,,TWD,,,,official,TBD,,candidate source: Taoyuan Airport MRT or official bus/rail operator
-Taiwan,Taipei,intercity_transport,intercity rail benchmark,,,,TWD,,,,official,TBD,,candidate source: Taiwan High Speed Rail official fare information
-Taiwan,Taipei,attractions,museum/attraction entry,,,,TWD,,,,official,TBD,,candidate source: official attraction page
-Taiwan,Taipei,connectivity,eSIM/SIM,,,,TWD,,,,official_or_observed,TBD,,placeholder row; do not use until populated with sourced observed price
-Taiwan,Taipei,miscellaneous,laundry or convenience item,,,,,,,,official_or_observed,TBD,,placeholder row; do not use until populated with sourced observed price
+country,city_or_area,basket_category,basket_item,local_price,local_currency,converted_price_usd,converted_price_gbp,source_name,source_url,source_type,source_confidence,observation_date,price_status,data_granularity,trip_profile,unit,quantity,basket_weight,notes
+Japan,Tokyo,accommodation,3-star hotel night,,,,,,,,TBD,,placeholder,placeholder,standard,night,1,4.0,placeholder row; do not use until populated with sourced observed price
+Japan,Tokyo,accommodation,hostel/private room,,,,,,,,TBD,,placeholder,placeholder,standard,night,1,2.5,placeholder row; do not use until populated with sourced observed price
+Japan,Tokyo,food_drink,cheap local meal,,,,,,,,TBD,,placeholder,placeholder,standard,meal,1,1.0,placeholder row; do not use until populated with sourced observed price
+Japan,Tokyo,food_drink,mid-range casual dinner,,,,,,,,TBD,,placeholder,placeholder,standard,meal,1,1.5,placeholder row; do not use until populated with sourced observed price
+Japan,Tokyo,food_drink,coffee,,,,,,,,TBD,,placeholder,placeholder,standard,drink,1,0.5,placeholder row; do not use until populated with sourced observed price
+Japan,Tokyo,local_transport,metro ride,180,JPY,,,Tokyo Metro regular ticket fare,https://www.tokyometro.jp/en/ticket/regular/index.html,official,high,2026-05-23,observed,fare_table,standard,ride,1,0.5,Official regular ticket fare table; uses minimum 1-6 km adult fare as conservative single-ride benchmark; Tokyo Metro fares vary by distance.
+Japan,Tokyo,local_transport,airport transfer,,JPY,,,,,official,TBD,,placeholder,placeholder,standard,trip,1,1.0,candidate source: official rail/bus operator fare
+Japan,Tokyo,intercity_transport,intercity rail benchmark,,JPY,,,,,official,TBD,,placeholder,placeholder,standard,trip,1,2.0,candidate source: JR/Shinkansen official fare reference
+Japan,Tokyo,attractions,museum/attraction entry,,JPY,,,,,official,TBD,,placeholder,placeholder,standard,entry,1,1.0,candidate source: official attraction page
+Japan,Tokyo,connectivity,eSIM/SIM,,JPY,,,,,official_or_observed,TBD,,placeholder,placeholder,standard,plan,1,0.5,placeholder row; do not use until populated with sourced observed price
+Japan,Tokyo,miscellaneous,laundry or convenience item,,,,,,,,TBD,,placeholder,placeholder,standard,item,1,0.5,placeholder row; do not use until populated with sourced observed price
+Taiwan,Taipei,accommodation,3-star hotel night,,,,,,,,TBD,,placeholder,placeholder,standard,night,1,4.0,placeholder row; do not use until populated with sourced observed price
+Taiwan,Taipei,accommodation,hostel/private room,,,,,,,,TBD,,placeholder,placeholder,standard,night,1,2.5,placeholder row; do not use until populated with sourced observed price
+Taiwan,Taipei,food_drink,cheap local meal,,,,,,,,TBD,,placeholder,placeholder,standard,meal,1,1.0,placeholder row; do not use until populated with sourced observed price
+Taiwan,Taipei,food_drink,mid-range casual dinner,,,,,,,,TBD,,placeholder,placeholder,standard,meal,1,1.5,placeholder row; do not use until populated with sourced observed price
+Taiwan,Taipei,food_drink,coffee,,,,,,,,TBD,,placeholder,placeholder,standard,drink,1,0.5,placeholder row; do not use until populated with sourced observed price
+Taiwan,Taipei,local_transport,metro ride,,TWD,,,,,official,TBD,,placeholder,placeholder,standard,ride,1,0.5,candidate source: Taipei Metro official fare information
+Taiwan,Taipei,local_transport,airport transfer,,TWD,,,,,official,TBD,,placeholder,placeholder,standard,trip,1,1.0,candidate source: Taoyuan Airport MRT or official bus/rail operator
+Taiwan,Taipei,intercity_transport,intercity rail benchmark,,TWD,,,,,official,TBD,,placeholder,placeholder,standard,trip,1,2.0,candidate source: Taiwan High Speed Rail official fare information
+Taiwan,Taipei,attractions,museum/attraction entry,,TWD,,,,,official,TBD,,placeholder,placeholder,standard,entry,1,1.0,candidate source: official attraction page
+Taiwan,Taipei,connectivity,eSIM/SIM,,TWD,,,,,official_or_observed,TBD,,placeholder,placeholder,standard,plan,1,0.5,placeholder row; do not use until populated with sourced observed price
+Taiwan,Taipei,miscellaneous,laundry or convenience item,,,,,,,,TBD,,placeholder,placeholder,standard,item,1,0.5,placeholder row; do not use until populated with sourced observed price
