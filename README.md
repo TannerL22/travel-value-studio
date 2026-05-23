@@ -61,7 +61,10 @@ npm run build
 
 # Backend syntax check
 cd backend
-.\.venv\Scripts\python.exe -m py_compile main.py data_sources.py
+.\.venv\Scripts\python.exe -m py_compile main.py data_sources.py source_registry.py
+
+# Minimal backend sanity checks
+.\.venv\Scripts\python.exe sanity_checks.py
 ```
 
 ## Data Methodology / Source Registry
@@ -104,6 +107,9 @@ Ranking rows also include a first-pass FX diagnostic:
 - `fx_tailwind_recent_ratio`: average of the one-year and three-year FX ratios.
 - `fx_tailwind_interpretation`: short label explaining whether the USD is stronger, weaker, or near recent history.
 - `component_fx_tailwind_source`: whether the FX Tailwind component used historical FX data or the model proxy.
+- `fx_tailwind_origin_*`: additive destination-vs-origin FX diagnostics computed from the selected origin currency. These fields do not change the ranking score yet.
+
+Data-quality flags also identify missing historical FX, proxy-based FX Tailwind, and missing FX reference dates when those diagnostics cannot be built.
 
 Methodology metadata is also available from the API:
 

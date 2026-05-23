@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from data_sources import build_dataset, compute_scores
+from data_sources import add_origin_fx_tailwind_diagnostics, build_dataset, compute_scores
 from source_registry import get_methodology_summary, get_source_registry
 
 
@@ -149,6 +149,15 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     origin_pp = scored.loc[origin_mask, "tourism_pp_power"].iloc[0] if not scored.loc[origin_mask].empty else 1.0
     if pd.isna(origin_pp) or origin_pp == 0:
         origin_pp = 1.0
+    origin_currency = None
+    if not scored.loc[origin_mask].empty:
+        origin_currency = scored.loc[origin_mask, "currency"].iloc[0]
+        if pd.isna(origin_currency):
+            origin_currency = None
+
+    # Additive diagnostic only: the ranking score still uses the existing FX Tailwind component.
+    # A later scoring pass can promote these origin-aware fields into component_fx_tailwind.
+    scored = add_origin_fx_tailwind_diagnostics(scored, origin_currency)
 
     # Relative Value Power: How much more/less value you get vs home
     scored["value_multiplier_relative"] = scored["tourism_pp_power"] / origin_pp
@@ -175,6 +184,7 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     
     meta["origin_used"] = query.origin_iso3
     meta["origin_pp_multiplier"] = float(origin_pp)
+    meta["origin_currency"] = origin_currency
 
     if include_meta:
         return {"meta": meta, "results": results}

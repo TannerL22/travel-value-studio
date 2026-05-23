@@ -63,6 +63,14 @@ export type RankingRow = {
   fx_tailwind_signal?: number | null;
   fx_tailwind_source?: string | null;
   fx_tailwind_interpretation?: string | null;
+  fx_tailwind_origin_currency?: string | null;
+  fx_tailwind_origin_1y?: number | null;
+  fx_tailwind_origin_3y?: number | null;
+  fx_tailwind_origin_recent_ratio?: number | null;
+  fx_tailwind_origin_1y_pct?: number | null;
+  fx_tailwind_origin_3y_pct?: number | null;
+  fx_tailwind_origin_interpretation?: string | null;
+  fx_tailwind_origin_source?: string | null;
   fx_frankfurter_date?: string | null;
   fx_frankfurter_1y_date?: string | null;
   fx_frankfurter_3y_date?: string | null;

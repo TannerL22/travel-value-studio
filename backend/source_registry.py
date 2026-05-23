@@ -228,6 +228,102 @@ SOURCE_REGISTRY: Dict[str, SourceField] = {
         "Labels explain the FX cross only and do not validate trip affordability.",
         "medium",
     ),
+    "fx_tailwind_origin_currency": SourceField(
+        "fx_tailwind_origin_currency",
+        "Origin currency for FX tailwind",
+        "Derived from selected origin country",
+        None,
+        "Per ranking request",
+        "Currency",
+        "derived",
+        "Currency used as the base for origin-aware FX Tailwind diagnostics.",
+        "Origin mapping still uses one primary country currency.",
+        "medium",
+    ),
+    "fx_tailwind_origin_1y": SourceField(
+        "fx_tailwind_origin_1y",
+        "Origin-adjusted one-year FX tailwind ratio",
+        "Derived from USD-base FX tables",
+        "(destination_current/origin_current) / (destination_1y/origin_1y)",
+        "Per ranking request",
+        "Currency pair",
+        "derived",
+        "Whether the destination currency is cheaper versus the selected origin currency than about one year ago.",
+        "Still uses Frankfurter bilateral crosses, not real effective exchange-rate data.",
+        "medium",
+    ),
+    "fx_tailwind_origin_3y": SourceField(
+        "fx_tailwind_origin_3y",
+        "Origin-adjusted three-year FX tailwind ratio",
+        "Derived from USD-base FX tables",
+        "(destination_current/origin_current) / (destination_3y/origin_3y)",
+        "Per ranking request",
+        "Currency pair",
+        "derived",
+        "Whether the destination currency is cheaper versus the selected origin currency than about three years ago.",
+        "A single reference date is not a full currency valuation band.",
+        "medium",
+    ),
+    "fx_tailwind_origin_recent_ratio": SourceField(
+        "fx_tailwind_origin_recent_ratio",
+        "Origin-adjusted recent FX tailwind ratio",
+        "Derived from USD-base FX tables",
+        "Mean of fx_tailwind_origin_1y and fx_tailwind_origin_3y",
+        "Per ranking request",
+        "Currency pair",
+        "derived",
+        "Average destination-vs-origin FX tailwind across one-year and three-year references.",
+        "Additive diagnostic only; current ranking score does not yet use this field.",
+        "medium",
+    ),
+    "fx_tailwind_origin_1y_pct": SourceField(
+        "fx_tailwind_origin_1y_pct",
+        "Origin-adjusted one-year FX tailwind percent",
+        "Derived from USD-base FX tables",
+        "(fx_tailwind_origin_1y - 1) * 100",
+        "Per ranking request",
+        "Currency pair",
+        "derived",
+        "Percent destination-vs-origin FX move versus about one year ago.",
+        "Positive values mean the selected origin currency buys more destination currency than the reference date.",
+        "medium",
+    ),
+    "fx_tailwind_origin_3y_pct": SourceField(
+        "fx_tailwind_origin_3y_pct",
+        "Origin-adjusted three-year FX tailwind percent",
+        "Derived from USD-base FX tables",
+        "(fx_tailwind_origin_3y - 1) * 100",
+        "Per ranking request",
+        "Currency pair",
+        "derived",
+        "Percent destination-vs-origin FX move versus about three years ago.",
+        "Positive values can still be offset by tourist-facing price increases.",
+        "medium",
+    ),
+    "fx_tailwind_origin_interpretation": SourceField(
+        "fx_tailwind_origin_interpretation",
+        "Origin-adjusted FX interpretation",
+        "Derived",
+        "Threshold labels from fx_tailwind_origin_recent_ratio",
+        "Per ranking request",
+        "Currency pair",
+        "derived",
+        "Plain-language diagnostic for destination-vs-origin historical FX tailwind.",
+        "Explains FX only; it does not validate actual trip cost.",
+        "medium",
+    ),
+    "fx_tailwind_origin_source": SourceField(
+        "fx_tailwind_origin_source",
+        "Origin-adjusted FX source",
+        "Derived",
+        None,
+        "Per ranking request",
+        "Currency pair",
+        "derived/fallback",
+        "Whether origin-aware historical FX diagnostics were available.",
+        "Unavailable rows retain the existing USD-based component and proxy behavior.",
+        "high",
+    ),
     "fx_tailwind_source": SourceField(
         "fx_tailwind_source",
         "FX tailwind source",
@@ -250,6 +346,30 @@ SOURCE_REGISTRY: Dict[str, SourceField] = {
         "derived/fallback",
         "Whether the FX Tailwind component used historical FX or the model proxy.",
         "Proxy rows are less reliable for judging currency cheapness versus history.",
+        "high",
+    ),
+    "fx_reference_dates_available": SourceField(
+        "fx_reference_dates_available",
+        "FX reference dates available",
+        "Derived from Frankfurter response dates",
+        "fx_frankfurter_1y_date and fx_frankfurter_3y_date",
+        "Per dataset build",
+        "Dataset",
+        "derived",
+        "Whether both one-year and three-year FX reference dates are available.",
+        "A true value does not imply full historical valuation coverage.",
+        "high",
+    ),
+    "fx_enrichment_warnings": SourceField(
+        "fx_enrichment_warnings",
+        "FX enrichment warnings",
+        "Derived",
+        None,
+        "Per dataset build",
+        "Dataset",
+        "derived",
+        "Pipe-delimited warning flags for partial FX enrichment failures.",
+        "Warnings are coarse source-health signals, not row-specific data audits.",
         "high",
     ),
     "fx_frankfurter_date": SourceField(
@@ -522,6 +642,24 @@ def compute_row_data_quality(row: Mapping[str, Any]) -> Dict[str, Any]:
         flags.append("missing_stability")
     if _is_missing(row.get("currency")):
         flags.append("missing_currency")
+    if _is_missing(row.get("fx_tailwind_signal")):
+        flags.append("missing_historical_fx")
+    if (
+        str(row.get("fx_tailwind_source", "")).upper() == "UNAVAILABLE"
+        or str(row.get("component_fx_tailwind_source", "")).lower() == "model_proxy"
+        or _is_missing(row.get("fx_tailwind_signal"))
+    ):
+        flags.append("fx_tailwind_proxy")
+
+    has_reference_dates = (
+        not _is_missing(row.get("fx_frankfurter_1y_date"))
+        and not _is_missing(row.get("fx_frankfurter_3y_date"))
+    )
+    reference_dates_available = row.get("fx_reference_dates_available")
+    if _is_missing(reference_dates_available):
+        reference_dates_available = has_reference_dates
+    if not bool(reference_dates_available) and not has_reference_dates:
+        flags.append("missing_fx_reference_dates")
 
     penalties = {
         "missing_ppp_private": 25,
@@ -531,6 +669,9 @@ def compute_row_data_quality(row: Mapping[str, Any]) -> Dict[str, Any]:
         "missing_arrivals": 10,
         "missing_stability": 15,
         "missing_currency": 8,
+        "missing_historical_fx": 6,
+        "fx_tailwind_proxy": 4,
+        "missing_fx_reference_dates": 4,
     }
     score = max(0, 100 - sum(penalties[flag] for flag in flags))
 

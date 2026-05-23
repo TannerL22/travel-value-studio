@@ -128,6 +128,9 @@ export function DestinationModal({
     country.fx_frankfurter_date && country.fx_frankfurter_1y_date && country.fx_frankfurter_3y_date
       ? `${country.fx_frankfurter_date} vs ${country.fx_frankfurter_1y_date} / ${country.fx_frankfurter_3y_date}`
       : "Historical references unavailable";
+  const hasOriginFxDiagnostic =
+    country.fx_tailwind_origin_source === "HISTORICAL_CROSS" &&
+    country.fx_tailwind_origin_currency;
 
   return (
     <AnimatePresence>
@@ -264,14 +267,30 @@ export function DestinationModal({
                   <p className="text-xs leading-5 text-zinc-300">
                     {country.fx_tailwind_interpretation ?? "FX tailwind is using the current model proxy."}
                   </p>
+                  {hasOriginFxDiagnostic ? (
+                    <p className="mt-1 text-[11px] leading-5 text-cyan-100/80">
+                      Origin-adjusted ({country.fx_tailwind_origin_currency}):{" "}
+                      {country.fx_tailwind_origin_interpretation}
+                    </p>
+                  ) : null}
                   <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded-md bg-white/5 p-2">
                       <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-500">1Y USD move</p>
                       <p className="mt-1 font-semibold text-white">{formatFxPercent(country.fx_tailwind_1y_pct)}</p>
+                      {hasOriginFxDiagnostic ? (
+                        <p className="mt-0.5 text-[10px] text-cyan-200/80">
+                          Origin {formatFxPercent(country.fx_tailwind_origin_1y_pct)}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="rounded-md bg-white/5 p-2">
                       <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-500">3Y USD move</p>
                       <p className="mt-1 font-semibold text-white">{formatFxPercent(country.fx_tailwind_3y_pct)}</p>
+                      {hasOriginFxDiagnostic ? (
+                        <p className="mt-0.5 text-[10px] text-cyan-200/80">
+                          Origin {formatFxPercent(country.fx_tailwind_origin_3y_pct)}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                   <p className="mt-2 text-[10px] leading-4 text-zinc-500">{fxReferenceLabel}</p>
