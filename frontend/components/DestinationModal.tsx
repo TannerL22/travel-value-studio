@@ -16,6 +16,44 @@ type DestinationModalProps = {
   isComparing: boolean;
 };
 
+type ComponentRow = {
+  label: string;
+  value: number | null | undefined;
+  tone: string;
+};
+
+const clampScore = (value: number | null | undefined) => {
+  if (value == null || !Number.isFinite(value)) return null;
+  return Math.max(0, Math.min(100, value));
+};
+
+const formatFxPercent = (value: number | null | undefined) => {
+  if (value == null || !Number.isFinite(value)) return "N/A";
+  const rounded = Math.round(value);
+  return `${rounded > 0 ? "+" : ""}${rounded}%`;
+};
+
+function ComponentBar({ label, value, tone }: ComponentRow) {
+  const score = clampScore(value);
+
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-3 text-[10px] uppercase tracking-[0.16em]">
+        <span className="truncate text-zinc-500">{label}</span>
+        <span className="shrink-0 font-semibold text-zinc-200">
+          {score == null ? "N/A" : Math.round(score)}
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+        <div
+          className={`h-full rounded-full ${tone}`}
+          style={{ width: `${score ?? 0}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function DestinationModal({
   country,
   isOpen,
@@ -46,6 +84,50 @@ export function DestinationModal({
     .filter((r) => r.iso3 !== country.iso3 && (r.Score ?? r.score ?? 0) > (country.Score ?? country.score ?? 0))
     .filter((r) => ((r.score_infra ?? 0) + (r.score_safety ?? 0)) / 2 >= quality * 0.9)
     .slice(0, 3);
+
+  const components: ComponentRow[] = [
+    {
+      label: "FX Tailwind",
+      value: country.component_fx_tailwind,
+      tone: "bg-cyan-400",
+    },
+    {
+      label: "PPP Advantage",
+      value: country.component_ppp_advantage,
+      tone: "bg-emerald-500",
+    },
+    {
+      label: "Comfort Floor",
+      value: country.component_comfort_floor,
+      tone: "bg-violet-400",
+    },
+    {
+      label: "Tourism Depth",
+      value: country.component_tourism_depth,
+      tone: "bg-blue-400",
+    },
+    {
+      label: "Safety / Stability",
+      value: country.component_safety_stability,
+      tone: "bg-lime-400",
+    },
+    {
+      label: "Overall Value",
+      value: country.component_overall_value ?? country.Score,
+      tone: "bg-white",
+    },
+  ];
+
+  const qualityScore = clampScore(country.data_quality_score);
+  const qualityFlags = country.data_quality_flags ?? [];
+  const fxComponentSource =
+    country.component_fx_tailwind_source === "historical_fx"
+      ? "Historical FX"
+      : "Model proxy";
+  const fxReferenceLabel =
+    country.fx_frankfurter_date && country.fx_frankfurter_1y_date && country.fx_frankfurter_3y_date
+      ? `${country.fx_frankfurter_date} vs ${country.fx_frankfurter_1y_date} / ${country.fx_frankfurter_3y_date}`
+      : "Historical references unavailable";
 
   return (
     <AnimatePresence>
@@ -150,6 +232,64 @@ export function DestinationModal({
             </div>
 
             <div className="space-y-6">
+              <div>
+                <div className="mb-3 flex items-center justify-between gap-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
+                    Value Components
+                  </h3>
+                  <div className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
+                    Data {country.data_quality_grade ?? "N/A"}
+                    {qualityScore != null ? ` ${Math.round(qualityScore)}` : ""}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {components.map((component) => (
+                    <ComponentBar
+                      key={component.label}
+                      label={component.label}
+                      value={component.value}
+                      tone={component.tone}
+                    />
+                  ))}
+                </div>
+                <div className="mt-4 rounded-lg border border-white/10 bg-zinc-950/50 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-300">
+                      FX Diagnostic
+                    </p>
+                    <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-zinc-400">
+                      {fxComponentSource}
+                    </span>
+                  </div>
+                  <p className="text-xs leading-5 text-zinc-300">
+                    {country.fx_tailwind_interpretation ?? "FX tailwind is using the current model proxy."}
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-md bg-white/5 p-2">
+                      <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-500">1Y USD move</p>
+                      <p className="mt-1 font-semibold text-white">{formatFxPercent(country.fx_tailwind_1y_pct)}</p>
+                    </div>
+                    <div className="rounded-md bg-white/5 p-2">
+                      <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-500">3Y USD move</p>
+                      <p className="mt-1 font-semibold text-white">{formatFxPercent(country.fx_tailwind_3y_pct)}</p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[10px] leading-4 text-zinc-500">{fxReferenceLabel}</p>
+                </div>
+                {qualityFlags.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {qualityFlags.slice(0, 4).map((flag) => (
+                      <span
+                        key={flag}
+                        className="rounded-full border border-white/10 bg-zinc-950/60 px-2 py-1 text-[9px] uppercase tracking-[0.12em] text-zinc-500"
+                      >
+                        {flag.replaceAll("_", " ")}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500 mb-3">Similar Destinations</h3>
                 <div className="grid grid-cols-3 gap-2">

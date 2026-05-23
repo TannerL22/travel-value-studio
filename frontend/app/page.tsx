@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ControlPanel, type FilterState, type Origin } from "@/components/ControlPanel";
 import { DestinationCard } from "@/components/DestinationCard";
 import { DestinationModal } from "@/components/DestinationModal";
+import { MethodologyPanel } from "@/components/MethodologyPanel";
 import { WorldMap } from "@/components/WorldMap";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -18,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutGrid, Globe, X, ArrowRight, Plus } from "lucide-react";
+import { LayoutGrid, Globe, X, ArrowRight, Plus, BookOpen } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 
@@ -37,7 +38,7 @@ const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
 
-const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
+export const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
 
 export type RankingRow = {
   country?: string | null;
@@ -51,6 +52,27 @@ export type RankingRow = {
   wgi_political_stability?: number | null;
   intl_arrivals?: number | null;
   iso3?: string | null;
+  data_quality_score?: number | null;
+  data_quality_grade?: "A" | "B" | "C" | "D" | null;
+  data_quality_flags?: string[] | null;
+  fx_tailwind_1y?: number | null;
+  fx_tailwind_3y?: number | null;
+  fx_tailwind_recent_ratio?: number | null;
+  fx_tailwind_1y_pct?: number | null;
+  fx_tailwind_3y_pct?: number | null;
+  fx_tailwind_signal?: number | null;
+  fx_tailwind_source?: string | null;
+  fx_tailwind_interpretation?: string | null;
+  fx_frankfurter_date?: string | null;
+  fx_frankfurter_1y_date?: string | null;
+  fx_frankfurter_3y_date?: string | null;
+  component_fx_tailwind?: number | null;
+  component_fx_tailwind_source?: string | null;
+  component_ppp_advantage?: number | null;
+  component_comfort_floor?: number | null;
+  component_tourism_depth?: number | null;
+  component_safety_stability?: number | null;
+  component_overall_value?: number | null;
 };
 
 const countryKey = (country: RankingRow) =>
@@ -106,6 +128,7 @@ export default function Home() {
 
   const [compareList, setCompareList] = useState<RankingRow[]>([]);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
+  const [isMethodologyOpen, setIsMethodologyOpen] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<RankingRow | null>(null);
 
   const currentOrigin = useMemo(() => 
@@ -295,6 +318,16 @@ export default function Home() {
             </h1>
           </div>
           <div className="flex items-center gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 border-white/10 bg-zinc-950/60 px-3 text-xs uppercase tracking-[0.18em] text-zinc-200 hover:bg-white/10 hover:text-white"
+              onClick={() => setIsMethodologyOpen(true)}
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              Method
+            </Button>
+
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "map")} className="bg-zinc-950/60 p-1 rounded-lg border border-white/10">
               <TabsList className="bg-transparent h-8">
                 <TabsTrigger value="grid" className="data-[state=active]:bg-white/10 data-[state=active]:text-white h-full px-3 gap-2 text-[10px] uppercase tracking-widest font-bold">
@@ -522,6 +555,12 @@ export default function Home() {
             />
           ) : null}
         </AnimatePresence>
+
+        <MethodologyPanel
+          apiUrl={apiUrl}
+          isOpen={isMethodologyOpen}
+          onClose={() => setIsMethodologyOpen(false)}
+        />
       </main>
     </div>
   );

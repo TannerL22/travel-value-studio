@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from data_sources import build_dataset, compute_scores
+from source_registry import get_methodology_summary, get_source_registry
 
 
 class RankingQuery(BaseModel):
@@ -101,6 +102,16 @@ def get_origins() -> Any:
     return origins
 
 
+@app.get("/api/source-registry")
+def get_api_source_registry() -> Any:
+    return get_source_registry()
+
+
+@app.get("/api/methodology")
+def get_api_methodology() -> Any:
+    return get_methodology_summary()
+
+
 @app.post("/api/rankings")
 def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     df_raw, meta = _get_cached_dataset(target_year=query.year)
@@ -157,8 +168,7 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
 
     # 4. Final Scoring
     scored["rank"] = np.arange(1, len(scored) + 1)
-    mx = scored["score"].max()
-    scored["Score"] = 100.0 * scored["score"] / (mx if mx and mx > 0 else 1.0)
+    scored["Score"] = scored["component_overall_value"]
 
     top = scored.head(250).replace([np.inf, -np.inf], np.nan)
     results = top.where(top.notna(), None).to_dict(orient="records")

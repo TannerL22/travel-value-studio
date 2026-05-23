@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple, List
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 import pandas as pd
 import requests
+
+from source_registry import compute_dataset_data_quality
 
 IMF_API = "https://www.imf.org/external/datamapper/api/v1"
 WDI_API = "https://api.worldbank.org/v2"
@@ -24,6 +27,7 @@ WDI_CPI = "FP.CPI.TOTL.ZG"
 
 RESTCOUNTRIES_ALPHA = "https://restcountries.com/v3.1/alpha"
 EXCHANGE_RATES = "https://api.exchangerate.host/latest"
+FRANKFURTER_API = "https://api.frankfurter.dev/v1"
 
 
 @dataclass
@@ -87,6 +91,23 @@ def _minmax(s: pd.Series, q=(0.01, 0.99)) -> pd.Series:
     if pd.isna(mn) or pd.isna(mx) or mx == mn:
         return pd.Series(np.nan, index=s.index)
     return (s - mn) / (mx - mn)
+
+
+def _component_score(s: pd.Series) -> pd.Series:
+    return (100.0 * s.clip(0, 1)).round(2)
+
+
+def _fx_tailwind_interpretation(ratio: object) -> str:
+    if pd.isna(ratio):
+        return "Proxy only"
+    value = float(ratio)
+    if value >= 1.1:
+        return "USD materially stronger than recent history"
+    if value >= 1.03:
+        return "USD modestly stronger than recent history"
+    if value >= 0.97:
+        return "Near recent FX history"
+    return "USD weaker than recent history"
 
 
 def _get_inf(inf_imf: pd.DataFrame, inf_wdi: pd.DataFrame, iso3: str, year: int) -> Optional[float]:
@@ -170,6 +191,49 @@ def fetch_live_fx_usd() -> Tuple[Dict[str, float], Optional[str]]:
     return out, date
 
 
+def fetch_frankfurter_rates_usd(date: Optional[str] = None) -> Tuple[Dict[str, float], Optional[str]]:
+    endpoint = f"{FRANKFURTER_API}/{date}" if date else f"{FRANKFURTER_API}/latest"
+    js = _get_json(endpoint, params={"base": "USD"}, timeout=60)
+    rates = js.get("rates", {}) if isinstance(js, dict) else {}
+    rate_date = js.get("date") if isinstance(js, dict) else None
+    out = {"USD": 1.0}
+    for k, v in rates.items():
+        try:
+            out[k] = float(v)
+        except Exception:
+            pass
+    return out, rate_date
+
+
+def fetch_frankfurter_fx_history_usd() -> Dict[str, object]:
+    latest_rates, latest_date = fetch_frankfurter_rates_usd()
+    if not latest_date:
+        return {
+            "latest_rates": latest_rates,
+            "latest_date": None,
+            "one_year_rates": {},
+            "one_year_date": None,
+            "three_year_rates": {},
+            "three_year_date": None,
+        }
+
+    latest_dt = datetime.fromisoformat(latest_date).replace(tzinfo=timezone.utc)
+    one_year_target = (latest_dt - timedelta(days=365)).date().isoformat()
+    three_year_target = (latest_dt - timedelta(days=365 * 3)).date().isoformat()
+
+    one_year_rates, one_year_date = fetch_frankfurter_rates_usd(one_year_target)
+    three_year_rates, three_year_date = fetch_frankfurter_rates_usd(three_year_target)
+
+    return {
+        "latest_rates": latest_rates,
+        "latest_date": latest_date,
+        "one_year_rates": one_year_rates,
+        "one_year_date": one_year_date,
+        "three_year_rates": three_year_rates,
+        "three_year_date": three_year_date,
+    }
+
+
 def build_dataset(
     target_year: int,
     use_imf_for_gdp: bool = True,
@@ -241,16 +305,77 @@ def build_dataset(
         try:
             iso3s = sorted(df["iso3"].dropna().unique().tolist())
             cur_map = fetch_country_currency_map(iso3s)
-            rates, rate_date = fetch_live_fx_usd()
+            fx_history = fetch_frankfurter_fx_history_usd()
+            frankfurter_rates = fx_history["latest_rates"]
+            fallback_rates: Dict[str, float] = {}
+            fallback_rate_date: Optional[str] = None
+            try:
+                fallback_rates, fallback_rate_date = fetch_live_fx_usd()
+            except Exception:
+                pass
             df["currency"] = df["iso3"].map(cur_map)
-            df["fx_lcu_per_usd_live"] = df["currency"].map(rates)
+            df["fx_lcu_per_usd_frankfurter"] = df["currency"].map(frankfurter_rates)
+            df["fx_lcu_per_usd_live_fallback"] = df["currency"].map(fallback_rates)
+            df["fx_lcu_per_usd_live"] = df["fx_lcu_per_usd_frankfurter"].combine_first(
+                df["fx_lcu_per_usd_live_fallback"]
+            )
+            df["fx_lcu_per_usd_1y_ago"] = df["currency"].map(fx_history["one_year_rates"])
+            df["fx_lcu_per_usd_3y_ago"] = df["currency"].map(fx_history["three_year_rates"])
+            df["fx_tailwind_1y"] = np.where(
+                df["fx_lcu_per_usd_live"].notna()
+                & df["fx_lcu_per_usd_1y_ago"].notna()
+                & (df["fx_lcu_per_usd_1y_ago"] > 0),
+                df["fx_lcu_per_usd_live"] / df["fx_lcu_per_usd_1y_ago"],
+                np.nan,
+            )
+            df["fx_tailwind_3y"] = np.where(
+                df["fx_lcu_per_usd_live"].notna()
+                & df["fx_lcu_per_usd_3y_ago"].notna()
+                & (df["fx_lcu_per_usd_3y_ago"] > 0),
+                df["fx_lcu_per_usd_live"] / df["fx_lcu_per_usd_3y_ago"],
+                np.nan,
+            )
+            fx_tailwind_ratio = pd.concat(
+                [df["fx_tailwind_1y"], df["fx_tailwind_3y"]],
+                axis=1,
+            ).mean(axis=1, skipna=True)
+            df["fx_tailwind_recent_ratio"] = fx_tailwind_ratio
+            df["fx_tailwind_1y_pct"] = (df["fx_tailwind_1y"] - 1.0) * 100.0
+            df["fx_tailwind_3y_pct"] = (df["fx_tailwind_3y"] - 1.0) * 100.0
+            # 0.80 = materially stronger than history, 1.00 = neutral, 1.20 = strong USD tailwind.
+            df["fx_tailwind_signal"] = ((fx_tailwind_ratio - 0.8) / 0.4).clip(0, 1)
+            df["fx_tailwind_source"] = np.where(
+                df["fx_tailwind_signal"].notna(),
+                "FRANKFURTER",
+                "UNAVAILABLE",
+            )
+            df["fx_tailwind_interpretation"] = df["fx_tailwind_recent_ratio"].map(_fx_tailwind_interpretation)
             df["fx_lcu_per_usd"] = df["fx_lcu_per_usd_live"].combine_first(df["fx_lcu_per_usd"])
-            df["fx_source"] = np.where(df["fx_lcu_per_usd_live"].notna(), "LIVE_FX", "WDI")
-            df["fx_live_date"] = rate_date
+            df["fx_source"] = np.select(
+                [
+                    df["fx_lcu_per_usd_frankfurter"].notna(),
+                    df["fx_lcu_per_usd_live_fallback"].notna(),
+                ],
+                ["FRANKFURTER", "LIVE_FX"],
+                default="WDI",
+            )
+            df["fx_frankfurter_date"] = fx_history["latest_date"]
+            df["fx_frankfurter_1y_date"] = fx_history["one_year_date"]
+            df["fx_frankfurter_3y_date"] = fx_history["three_year_date"]
+            df["fx_live_date"] = np.where(
+                df["fx_lcu_per_usd_frankfurter"].notna(),
+                fx_history["latest_date"],
+                np.where(df["fx_lcu_per_usd_live_fallback"].notna(), fallback_rate_date, np.nan),
+            )
             vintages["fx_lcu_per_usd"] = SeriesVintage(
-                "Live FX feed (USD base) + RestCountries currency mapping; fallback WDI",
+                "Frankfurter latest FX (USD base) + RestCountries currency mapping; fallback legacy live FX then WDI",
                 target_year,
-                f"Live FX date: {rate_date}"
+                f"Frankfurter date: {fx_history['latest_date']}; fallback live FX date: {fallback_rate_date}"
+            )
+            vintages["fx_tailwind_signal"] = SeriesVintage(
+                "Frankfurter historical FX, latest versus 1y and 3y references",
+                target_year,
+                f"Reference dates: {fx_history['one_year_date']}, {fx_history['three_year_date']}"
             )
         except Exception:
             pass
@@ -267,12 +392,17 @@ def build_dataset(
 
     for c in ["gdp_nom_pc_usd","gdp_ppp_pc_int","ppp_private_lcu_per_int","fx_lcu_per_usd",
               "tourism_pp_power","intl_arrivals","wgi_political_stability",
-              "touri_infra","safety","price_comp","fx_lcu_per_usd_live"]:
+              "touri_infra","safety","price_comp","fx_lcu_per_usd_live",
+              "fx_lcu_per_usd_frankfurter","fx_lcu_per_usd_live_fallback",
+              "fx_lcu_per_usd_1y_ago","fx_lcu_per_usd_3y_ago",
+              "fx_tailwind_1y","fx_tailwind_3y","fx_tailwind_recent_ratio",
+              "fx_tailwind_1y_pct","fx_tailwind_3y_pct","fx_tailwind_signal"]:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
 
     df = df[df["iso3"].notna() & (df["iso3"] != "")]
     df["country"] = df["country"].fillna(df["iso3"])
+    df = compute_dataset_data_quality(df)
     return df, vintages
 
 
@@ -310,6 +440,24 @@ def compute_scores(
 
     eps = 1e-6
     d["score_tourism_cost"] = (eps + cost_component).pow(tourism_cost_weight)
+    d["component_ppp_advantage"] = _component_score(cost_component)
+
+    fx_live_available = d.get("fx_lcu_per_usd_live", pd.Series(np.nan, index=d.index)).notna()
+    fx_source_live = d.get("fx_source", pd.Series("", index=d.index)).astype(str).str.upper().isin(["FRANKFURTER", "LIVE_FX"])
+    fx_availability = (fx_live_available | fx_source_live).astype(float)
+    fx_tailwind_proxy = (0.7 * tpp_scaled.fillna(0) + 0.3 * fx_availability).clip(0, 1)
+    fx_tailwind_signal = d.get("fx_tailwind_signal", pd.Series(np.nan, index=d.index))
+    has_historical_fx_tailwind = fx_tailwind_signal.notna()
+    d["component_fx_tailwind"] = _component_score(fx_tailwind_signal.combine_first(fx_tailwind_proxy))
+    d["component_fx_tailwind_source"] = np.where(
+        has_historical_fx_tailwind,
+        "historical_fx",
+        "model_proxy",
+    )
+    if "fx_tailwind_interpretation" not in d.columns:
+        d["fx_tailwind_interpretation"] = "Proxy only"
+    else:
+        d["fx_tailwind_interpretation"] = d["fx_tailwind_interpretation"].fillna("Proxy only")
 
     arr_scaled = _minmax(np.log1p(d["intl_arrivals"].clip(lower=0)))
     if "touri_infra" in d.columns and d["touri_infra"].notna().any():
@@ -319,6 +467,7 @@ def compute_scores(
     else:
         infra_component = arr_scaled
     d["score_infra"] = (eps + infra_component).pow(tourism_infra_weight)
+    d["component_tourism_depth"] = _component_score(infra_component)
 
     wgi_scaled = ((d["wgi_political_stability"] + 2.5) / 5.0).clip(0, 1)
     if "safety" in d.columns and d["safety"].notna().any():
@@ -327,10 +476,15 @@ def compute_scores(
     else:
         safety_component = wgi_scaled
     d["score_safety"] = (eps + safety_component).pow(safety_weight)
+    d["component_safety_stability"] = _component_score(safety_component)
+
+    d["component_comfort_floor"] = _component_score(d["score_floor_penalty"])
 
     if min_stability is not None:
         d = d[wgi_scaled >= float(min_stability)].copy()
 
     d["score"] = d["score_base"] * d["score_floor_penalty"] * d["score_tourism_cost"] * d["score_infra"] * d["score_safety"]
     d = d.dropna(subset=["score"]).sort_values("score", ascending=False).reset_index(drop=True)
+    mx = d["score"].max()
+    d["component_overall_value"] = (100.0 * d["score"] / (mx if mx and mx > 0 else 1.0)).round(2)
     return d
