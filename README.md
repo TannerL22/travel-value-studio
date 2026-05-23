@@ -65,6 +65,9 @@ cd backend
 
 # Minimal backend sanity checks
 .\.venv\Scripts\python.exe sanity_checks.py
+
+# Japan/Taiwan validation scaffold checks
+.\.venv\Scripts\python.exe validation\run_validation_checks.py
 ```
 
 ## Data Methodology / Source Registry
@@ -117,6 +120,19 @@ Methodology metadata is also available from the API:
 - `GET /api/methodology`: component definitions, current model status, and known limitations.
 
 Important limitation: current daily-cost outputs are model estimates derived from macro purchasing-power, FX, tourism-depth, and scarcity proxies. They are not observed tourist basket costs for hotels, meals, local transport, or attractions. The source registry is the foundation for later work to separate weak currencies from genuinely cheap trips.
+
+## Japan/Taiwan Validation Scaffold
+
+`backend/validation/` defines the evidence structure for testing whether the model can explain the difference between a cheap currency and an actually good tourist-value trip. The first validation case is Japan versus Taiwan.
+
+This scaffold does not prove whether Japan or Taiwan is better value yet. It includes:
+
+- `japan_taiwan_validation_methodology.md`: validation question, evidence tiers, and falsification criteria.
+- `japan_taiwan_basket_template.csv`: blank tourist-basket rows for accommodation, food/drink, transport, attractions, connectivity, and miscellaneous costs.
+- `japan_taiwan_source_register.csv`: official-source candidates for Japan and Taiwan tourism spend, transport fares, and tourism statistics.
+- `validation_schema.py` and `run_validation_checks.py`: lightweight pandas checks that required columns are present.
+
+The goal is to compare macro FX/PPP outputs against actual tourist-basket evidence once source-backed prices are collected. Placeholder rows must not be treated as observed prices.
 
 ## Notes
 
