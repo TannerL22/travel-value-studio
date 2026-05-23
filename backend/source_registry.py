@@ -344,8 +344,8 @@ SOURCE_REGISTRY: Dict[str, SourceField] = {
         "Per scoring run",
         "Country/currency",
         "derived/fallback",
-        "Whether the FX Tailwind component used historical FX or the model proxy.",
-        "Proxy rows are less reliable for judging currency cheapness versus history.",
+        "Whether FX Tailwind used origin historical FX, USD historical FX, or the model proxy.",
+        "Origin historical FX is preferred, but none of these sources prove tourist-basket affordability.",
         "high",
     ),
     "fx_reference_dates_available": SourceField(
@@ -534,9 +534,9 @@ SOURCE_REGISTRY: Dict[str, SourceField] = {
 COMPONENT_REGISTRY: Dict[str, Dict[str, str]] = {
     "component_fx_tailwind": {
         "label": "FX Tailwind",
-        "current_definition": "Frankfurter latest FX versus one-year and three-year USD reference rates where available; otherwise current-model proxy.",
-        "measures": "Whether USD buys more local currency now than recent history suggests.",
-        "caveat": "Still not a real effective exchange-rate valuation; BIS NEER/REER remains a later upgrade.",
+        "current_definition": "Preferred: destination currency movement versus the selected origin currency using Frankfurter historical cross rates. Fallback: USD-based Frankfurter signal or current-model proxy.",
+        "measures": "Whether the selected origin currency buys more destination currency now than recent history suggests.",
+        "caveat": "FX Tailwind is not an observed tourist basket, does not adjust for tourist-facing inflation, and is not BIS NEER/REER.",
     },
     "component_ppp_advantage": {
         "label": "PPP Advantage",
@@ -575,7 +575,7 @@ METHODOLOGY_SUMMARY: Dict[str, Any] = {
     "current_model_status": "Component scores expose the current model's internal signals without changing the core ranking model.",
     "known_limitations": [
         "Daily cost is currently a model estimate, not an observed tourist basket.",
-        "FX Tailwind uses short historical USD crosses where available, but not yet NEER or REER.",
+        "FX Tailwind uses short historical origin-currency crosses where available, with USD and proxy fallbacks; it is not yet NEER or REER.",
         "PPP and GDP inputs are annual country-level macro series.",
         "Tourism depth and safety are country-level proxies and can miss city-level differences.",
     ],
@@ -642,12 +642,27 @@ def compute_row_data_quality(row: Mapping[str, Any]) -> Dict[str, Any]:
         flags.append("missing_stability")
     if _is_missing(row.get("currency")):
         flags.append("missing_currency")
-    if _is_missing(row.get("fx_tailwind_signal")):
+    component_fx_source = str(row.get("component_fx_tailwind_source", "")).lower()
+    has_origin_historical_fx = (
+        component_fx_source == "origin_historical_fx"
+        or str(row.get("fx_tailwind_origin_source", "")).upper() == "HISTORICAL_CROSS"
+        or not _is_missing(row.get("fx_tailwind_origin_recent_ratio"))
+    )
+    has_usd_historical_fx = (
+        component_fx_source == "usd_historical_fx"
+        or not _is_missing(row.get("fx_tailwind_signal"))
+    )
+    has_any_historical_fx = has_origin_historical_fx or has_usd_historical_fx
+
+    if not has_any_historical_fx:
         flags.append("missing_historical_fx")
     if (
-        str(row.get("fx_tailwind_source", "")).upper() == "UNAVAILABLE"
-        or str(row.get("component_fx_tailwind_source", "")).lower() == "model_proxy"
-        or _is_missing(row.get("fx_tailwind_signal"))
+        component_fx_source == "model_proxy"
+        or (
+            not component_fx_source
+            and str(row.get("fx_tailwind_source", "")).upper() == "UNAVAILABLE"
+            and not has_origin_historical_fx
+        )
     ):
         flags.append("fx_tailwind_proxy")
 

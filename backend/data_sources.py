@@ -97,6 +97,12 @@ def _component_score(s: pd.Series) -> pd.Series:
     return (100.0 * s.clip(0, 1)).round(2)
 
 
+def _fx_tailwind_signal_from_ratio(s: pd.Series) -> pd.Series:
+    # Ratio > 1 means the base currency currently buys more destination currency than the reference.
+    # The 0.80..1.20 band maps weaker-than-history to 0, neutral to 0.5, and strong tailwind to 1.
+    return ((s - 0.8) / 0.4).clip(0, 1)
+
+
 def _fx_tailwind_interpretation(ratio: object, base_label: str = "USD") -> str:
     if pd.isna(ratio):
         return "Proxy only"
@@ -251,6 +257,69 @@ def add_origin_fx_tailwind_diagnostics(
             out.at[idx, "fx_tailwind_origin_source"] = "HISTORICAL_CROSS"
 
     return out
+
+
+def promote_origin_fx_tailwind_component(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    proxy_source = out.get(
+        "component_fx_tailwind_source",
+        pd.Series("model_proxy", index=out.index),
+    ).astype(str)
+    fallback_component = out.get("component_fx_tailwind", pd.Series(np.nan, index=out.index))
+    usd_signal = out.get("fx_tailwind_signal", pd.Series(np.nan, index=out.index))
+    origin_ratio = out.get("fx_tailwind_origin_recent_ratio", pd.Series(np.nan, index=out.index))
+
+    origin_component = _component_score(_fx_tailwind_signal_from_ratio(origin_ratio))
+    usd_component = _component_score(usd_signal)
+
+    has_origin = origin_ratio.notna()
+    has_usd = usd_signal.notna()
+    out["component_fx_tailwind"] = origin_component.where(
+        has_origin,
+        usd_component.where(has_usd, fallback_component),
+    )
+    out["component_fx_tailwind_source"] = np.select(
+        [has_origin, has_usd],
+        ["origin_historical_fx", "usd_historical_fx"],
+        default="model_proxy",
+    )
+    out["component_fx_tailwind_source"] = out["component_fx_tailwind_source"].where(
+        out["component_fx_tailwind"].notna(),
+        proxy_source,
+    )
+    return out
+
+
+def resolve_origin_context(df_raw: pd.DataFrame, requested_iso3: str) -> Dict[str, object]:
+    requested = (requested_iso3 or "USA").upper()
+    iso = df_raw["iso3"].astype(str).str.upper()
+    rows = df_raw[iso == requested]
+    fallback_used = False
+    origin_used = requested
+
+    # Fall back to USA only when the selected origin country is absent from the raw dataset.
+    # If the origin is later dropped during scoring, preserve its raw currency/PPP context.
+    if rows.empty:
+        rows = df_raw[iso == "USA"]
+        origin_used = "USA"
+        fallback_used = requested != "USA"
+
+    origin_pp = 1.0
+    origin_currency = None
+    if not rows.empty:
+        row = rows.iloc[0]
+        if pd.notna(row.get("tourism_pp_power")) and row.get("tourism_pp_power") != 0:
+            origin_pp = float(row.get("tourism_pp_power"))
+        if pd.notna(row.get("currency")):
+            origin_currency = row.get("currency")
+
+    return {
+        "origin_requested": requested,
+        "origin_used": origin_used,
+        "origin_fallback_used": fallback_used,
+        "origin_pp_multiplier": origin_pp,
+        "origin_currency": origin_currency,
+    }
 
 
 def _get_inf(inf_imf: pd.DataFrame, inf_wdi: pd.DataFrame, iso3: str, year: int) -> Optional[float]:
@@ -538,9 +607,7 @@ def build_dataset(
         df["fx_tailwind_recent_ratio"] = fx_tailwind_ratio
         df["fx_tailwind_1y_pct"] = (df["fx_tailwind_1y"] - 1.0) * 100.0
         df["fx_tailwind_3y_pct"] = (df["fx_tailwind_3y"] - 1.0) * 100.0
-        # Ratio > 1 means USD currently buys more destination currency than the historical reference.
-        # The 0.80..1.20 band maps weaker-than-history to 0, neutral to 0.5, and strong tailwind to 1.
-        df["fx_tailwind_signal"] = ((fx_tailwind_ratio - 0.8) / 0.4).clip(0, 1)
+        df["fx_tailwind_signal"] = _fx_tailwind_signal_from_ratio(fx_tailwind_ratio)
         df["fx_tailwind_source"] = np.where(
             df["fx_tailwind_signal"].notna(),
             "FRANKFURTER",
@@ -651,7 +718,7 @@ def compute_scores(
     d["component_fx_tailwind"] = _component_score(fx_tailwind_signal.combine_first(fx_tailwind_proxy))
     d["component_fx_tailwind_source"] = np.where(
         has_historical_fx_tailwind,
-        "historical_fx",
+        "usd_historical_fx",
         "model_proxy",
     )
     if "fx_tailwind_interpretation" not in d.columns:

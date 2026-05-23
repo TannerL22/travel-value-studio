@@ -11,7 +11,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from data_sources import add_origin_fx_tailwind_diagnostics, build_dataset, compute_scores
+from data_sources import (
+    add_origin_fx_tailwind_diagnostics,
+    build_dataset,
+    compute_scores,
+    promote_origin_fx_tailwind_component,
+    resolve_origin_context,
+)
 from source_registry import get_methodology_summary, get_source_registry
 
 
@@ -115,6 +121,7 @@ def get_api_methodology() -> Any:
 @app.post("/api/rankings")
 def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     df_raw, meta = _get_cached_dataset(target_year=query.year)
+    origin_context = resolve_origin_context(df_raw, query.origin_iso3)
 
     # Calculate base weights
     alpha = 1.0 + 2.2 * query.budget_sens
@@ -141,23 +148,11 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     )
 
     # 2. Origin-Based Normalization
-    origin_mask = scored["iso3"] == query.origin_iso3.upper()
-    if not origin_mask.any():
-        # Fallback to USA if origin not found in dataset
-        origin_mask = scored["iso3"] == "USA"
-    
-    origin_pp = scored.loc[origin_mask, "tourism_pp_power"].iloc[0] if not scored.loc[origin_mask].empty else 1.0
-    if pd.isna(origin_pp) or origin_pp == 0:
-        origin_pp = 1.0
-    origin_currency = None
-    if not scored.loc[origin_mask].empty:
-        origin_currency = scored.loc[origin_mask, "currency"].iloc[0]
-        if pd.isna(origin_currency):
-            origin_currency = None
+    origin_pp = origin_context["origin_pp_multiplier"]
+    origin_currency = origin_context["origin_currency"]
 
-    # Additive diagnostic only: the ranking score still uses the existing FX Tailwind component.
-    # A later scoring pass can promote these origin-aware fields into component_fx_tailwind.
     scored = add_origin_fx_tailwind_diagnostics(scored, origin_currency)
+    scored = promote_origin_fx_tailwind_component(scored)
 
     # Relative Value Power: How much more/less value you get vs home
     scored["value_multiplier_relative"] = scored["tourism_pp_power"] / origin_pp
@@ -182,8 +177,10 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     top = scored.head(250).replace([np.inf, -np.inf], np.nan)
     results = top.where(top.notna(), None).to_dict(orient="records")
     
-    meta["origin_used"] = query.origin_iso3
-    meta["origin_pp_multiplier"] = float(origin_pp)
+    meta["origin_requested"] = origin_context["origin_requested"]
+    meta["origin_used"] = origin_context["origin_used"]
+    meta["origin_fallback_used"] = origin_context["origin_fallback_used"]
+    meta["origin_pp_multiplier"] = float(origin_context["origin_pp_multiplier"])
     meta["origin_currency"] = origin_currency
 
     if include_meta:

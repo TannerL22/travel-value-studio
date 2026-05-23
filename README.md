@@ -94,7 +94,7 @@ Ranking rows include simple data-quality fields:
 
 Ranking rows also expose named component scores on a 0-100 scale:
 
-- `component_fx_tailwind`: historical FX support from Frankfurter latest rates versus one-year and three-year USD reference rates where available. Currencies without Frankfurter history still fall back to the older current-model proxy. True real-effective valuation still needs a future BIS NEER/REER module.
+- `component_fx_tailwind`: preferred signal is destination-currency movement versus the selected origin currency using Frankfurter historical cross rates. It falls back to the USD-based Frankfurter signal, then to the current model proxy. This is still not a tourist basket, not BIS NEER/REER, and not adjusted for tourist-facing inflation.
 - `component_ppp_advantage`: broad local price advantage from FX versus private-consumption PPP, with optional price-competitiveness input when available.
 - `component_comfort_floor`: penalty/boost from PPP income floor used to avoid over-ranking very low-comfort destinations.
 - `component_tourism_depth`: arrivals and optional tourism infrastructure signal.
@@ -106,8 +106,8 @@ Ranking rows also include a first-pass FX diagnostic:
 - `fx_tailwind_1y_pct` and `fx_tailwind_3y_pct`: percent change in local-currency units per USD versus the Frankfurter one-year and three-year reference dates.
 - `fx_tailwind_recent_ratio`: average of the one-year and three-year FX ratios.
 - `fx_tailwind_interpretation`: short label explaining whether the USD is stronger, weaker, or near recent history.
-- `component_fx_tailwind_source`: whether the FX Tailwind component used historical FX data or the model proxy.
-- `fx_tailwind_origin_*`: additive destination-vs-origin FX diagnostics computed from the selected origin currency. These fields do not change the ranking score yet.
+- `component_fx_tailwind_source`: whether the FX Tailwind component used `origin_historical_fx`, `usd_historical_fx`, or `model_proxy`.
+- `fx_tailwind_origin_*`: destination-vs-origin FX diagnostics computed from the selected origin currency. These are now preferred for `component_fx_tailwind` where available.
 
 Data-quality flags also identify missing historical FX, proxy-based FX Tailwind, and missing FX reference dates when those diagnostics cannot be built.
 

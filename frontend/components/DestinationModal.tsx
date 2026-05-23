@@ -120,15 +120,17 @@ export function DestinationModal({
 
   const qualityScore = clampScore(country.data_quality_score);
   const qualityFlags = country.data_quality_flags ?? [];
-  const fxComponentSource =
-    country.component_fx_tailwind_source === "historical_fx"
-      ? "Historical FX"
-      : "Model proxy";
+  const fxComponentSource = (() => {
+    if (country.component_fx_tailwind_source === "origin_historical_fx") return "Origin FX";
+    if (country.component_fx_tailwind_source === "usd_historical_fx") return "USD FX";
+    return "Model proxy";
+  })();
   const fxReferenceLabel =
     country.fx_frankfurter_date && country.fx_frankfurter_1y_date && country.fx_frankfurter_3y_date
       ? `${country.fx_frankfurter_date} vs ${country.fx_frankfurter_1y_date} / ${country.fx_frankfurter_3y_date}`
       : "Historical references unavailable";
   const hasOriginFxDiagnostic =
+    country.component_fx_tailwind_source === "origin_historical_fx" &&
     country.fx_tailwind_origin_source === "HISTORICAL_CROSS" &&
     country.fx_tailwind_origin_currency;
 
@@ -264,31 +266,43 @@ export function DestinationModal({
                       {fxComponentSource}
                     </span>
                   </div>
-                  <p className="text-xs leading-5 text-zinc-300">
-                    {country.fx_tailwind_interpretation ?? "FX tailwind is using the current model proxy."}
-                  </p>
                   {hasOriginFxDiagnostic ? (
-                    <p className="mt-1 text-[11px] leading-5 text-cyan-100/80">
-                      Origin-adjusted ({country.fx_tailwind_origin_currency}):{" "}
+                    <p className="text-xs leading-5 text-zinc-300">
                       {country.fx_tailwind_origin_interpretation}
                     </p>
-                  ) : null}
+                  ) : (
+                    <p className="text-xs leading-5 text-zinc-300">
+                      {country.fx_tailwind_interpretation ?? "FX tailwind is using the current model proxy."}
+                    </p>
+                  )}
                   <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded-md bg-white/5 p-2">
-                      <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-500">1Y USD move</p>
-                      <p className="mt-1 font-semibold text-white">{formatFxPercent(country.fx_tailwind_1y_pct)}</p>
+                      <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-500">
+                        {hasOriginFxDiagnostic ? `1Y vs ${country.fx_tailwind_origin_currency}` : "1Y USD move"}
+                      </p>
+                      <p className="mt-1 font-semibold text-white">
+                        {formatFxPercent(
+                          hasOriginFxDiagnostic ? country.fx_tailwind_origin_1y_pct : country.fx_tailwind_1y_pct
+                        )}
+                      </p>
                       {hasOriginFxDiagnostic ? (
                         <p className="mt-0.5 text-[10px] text-cyan-200/80">
-                          Origin {formatFxPercent(country.fx_tailwind_origin_1y_pct)}
+                          USD {formatFxPercent(country.fx_tailwind_1y_pct)}
                         </p>
                       ) : null}
                     </div>
                     <div className="rounded-md bg-white/5 p-2">
-                      <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-500">3Y USD move</p>
-                      <p className="mt-1 font-semibold text-white">{formatFxPercent(country.fx_tailwind_3y_pct)}</p>
+                      <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-500">
+                        {hasOriginFxDiagnostic ? `3Y vs ${country.fx_tailwind_origin_currency}` : "3Y USD move"}
+                      </p>
+                      <p className="mt-1 font-semibold text-white">
+                        {formatFxPercent(
+                          hasOriginFxDiagnostic ? country.fx_tailwind_origin_3y_pct : country.fx_tailwind_3y_pct
+                        )}
+                      </p>
                       {hasOriginFxDiagnostic ? (
                         <p className="mt-0.5 text-[10px] text-cyan-200/80">
-                          Origin {formatFxPercent(country.fx_tailwind_origin_3y_pct)}
+                          USD {formatFxPercent(country.fx_tailwind_3y_pct)}
                         </p>
                       ) : null}
                     </div>

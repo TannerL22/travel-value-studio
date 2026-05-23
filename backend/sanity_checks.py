@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
-from data_sources import add_origin_fx_tailwind_diagnostics, compute_fx_tailwind_ratio_from_usd_rates
+from data_sources import (
+    add_origin_fx_tailwind_diagnostics,
+    compute_fx_tailwind_ratio_from_usd_rates,
+    promote_origin_fx_tailwind_component,
+    resolve_origin_context,
+)
 from source_registry import compute_row_data_quality
 
 
@@ -89,11 +95,85 @@ def test_origin_fx_tailwind_diagnostics() -> None:
     assert jpy["fx_tailwind_origin_source"] == "HISTORICAL_CROSS"
 
 
+def test_origin_fx_component_override_math() -> None:
+    df = pd.DataFrame(
+        [
+            {
+                "component_fx_tailwind": 25.0,
+                "component_fx_tailwind_source": "usd_historical_fx",
+                "fx_tailwind_signal": 0.25,
+                "fx_tailwind_origin_recent_ratio": 1.2,
+            }
+        ]
+    )
+    out = promote_origin_fx_tailwind_component(df)
+    row = out.iloc[0]
+    assert row["component_fx_tailwind"] == 100.0
+    assert row["component_fx_tailwind_source"] == "origin_historical_fx"
+
+
+def test_fx_component_falls_back_to_usd_history() -> None:
+    df = pd.DataFrame(
+        [
+            {
+                "component_fx_tailwind": 20.0,
+                "component_fx_tailwind_source": "model_proxy",
+                "fx_tailwind_signal": 0.75,
+                "fx_tailwind_origin_recent_ratio": np.nan,
+            }
+        ]
+    )
+    out = promote_origin_fx_tailwind_component(df)
+    row = out.iloc[0]
+    assert row["component_fx_tailwind"] == 75.0
+    assert row["component_fx_tailwind_source"] == "usd_historical_fx"
+
+
+def test_fx_component_falls_back_to_model_proxy() -> None:
+    df = pd.DataFrame(
+        [
+            {
+                "component_fx_tailwind": 33.0,
+                "component_fx_tailwind_source": "model_proxy",
+                "fx_tailwind_signal": np.nan,
+                "fx_tailwind_origin_recent_ratio": np.nan,
+            }
+        ]
+    )
+    out = promote_origin_fx_tailwind_component(df)
+    row = out.iloc[0]
+    assert row["component_fx_tailwind"] == 33.0
+    assert row["component_fx_tailwind_source"] == "model_proxy"
+
+
+def test_origin_context_uses_raw_dataset() -> None:
+    df_raw = pd.DataFrame(
+        [
+            {"iso3": "USA", "currency": "USD", "tourism_pp_power": 1.0},
+            {"iso3": "TWN", "currency": "TWD", "tourism_pp_power": 1.8},
+        ]
+    )
+    selected = resolve_origin_context(df_raw, "TWN")
+    assert selected["origin_used"] == "TWN"
+    assert selected["origin_currency"] == "TWD"
+    assert selected["origin_pp_multiplier"] == 1.8
+    assert selected["origin_fallback_used"] is False
+
+    fallback = resolve_origin_context(df_raw, "ZZZ")
+    assert fallback["origin_used"] == "USA"
+    assert fallback["origin_currency"] == "USD"
+    assert fallback["origin_fallback_used"] is True
+
+
 def main() -> None:
     test_good_row_quality()
     test_missing_ppp_fx_quality()
     test_cross_rate_tailwind_math()
     test_origin_fx_tailwind_diagnostics()
+    test_origin_fx_component_override_math()
+    test_fx_component_falls_back_to_usd_history()
+    test_fx_component_falls_back_to_model_proxy()
+    test_origin_context_uses_raw_dataset()
     print("Backend sanity checks passed.")
 
 
