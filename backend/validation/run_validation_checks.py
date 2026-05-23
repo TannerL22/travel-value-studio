@@ -9,6 +9,10 @@ from validation_schema import (
     validate_japan_official_visitor_spend_per_day,
     validate_japan_official_visitor_spend_summary,
     validate_source_register,
+    validate_taiwan_official_length_of_stay,
+    validate_taiwan_official_visitor_spend,
+    validate_taiwan_official_visitor_spend_per_day,
+    validate_taiwan_official_visitor_spend_summary,
 )
 
 
@@ -22,6 +26,14 @@ JAPAN_OFFICIAL_VISITOR_SPEND_PER_DAY = (
 )
 JAPAN_OFFICIAL_VISITOR_SPEND_SUMMARY = (
     VALIDATION_DIR / "japan_official_visitor_spend_summary.csv"
+)
+TAIWAN_OFFICIAL_VISITOR_SPEND = VALIDATION_DIR / "taiwan_official_visitor_spend.csv"
+TAIWAN_OFFICIAL_LENGTH_OF_STAY = VALIDATION_DIR / "taiwan_official_length_of_stay.csv"
+TAIWAN_OFFICIAL_VISITOR_SPEND_PER_DAY = (
+    VALIDATION_DIR / "taiwan_official_visitor_spend_per_day.csv"
+)
+TAIWAN_OFFICIAL_VISITOR_SPEND_SUMMARY = (
+    VALIDATION_DIR / "taiwan_official_visitor_spend_summary.csv"
 )
 
 
@@ -61,10 +73,44 @@ def main() -> None:
     else:
         summary_message = ", Japan spend summary not yet populated"
 
+    if TAIWAN_OFFICIAL_VISITOR_SPEND.exists():
+        taiwan_spend = validate_taiwan_official_visitor_spend(
+            TAIWAN_OFFICIAL_VISITOR_SPEND
+        )
+        taiwan_spend_message = f", {len(taiwan_spend)} Taiwan official spend rows"
+    else:
+        taiwan_spend_message = ", Taiwan official spend dataset not yet populated"
+
+    if TAIWAN_OFFICIAL_LENGTH_OF_STAY.exists():
+        taiwan_length = validate_taiwan_official_length_of_stay(
+            TAIWAN_OFFICIAL_LENGTH_OF_STAY
+        )
+        taiwan_length_message = f", {len(taiwan_length)} Taiwan length-of-stay rows"
+    else:
+        taiwan_length_message = ", Taiwan length-of-stay dataset not yet populated"
+
+    if TAIWAN_OFFICIAL_VISITOR_SPEND_PER_DAY.exists():
+        taiwan_per_day = validate_taiwan_official_visitor_spend_per_day(
+            TAIWAN_OFFICIAL_VISITOR_SPEND_PER_DAY
+        )
+        taiwan_per_day_message = f", {len(taiwan_per_day)} Taiwan per-day spend rows"
+    else:
+        taiwan_per_day_message = ", Taiwan per-day spend dataset not yet populated"
+
+    if TAIWAN_OFFICIAL_VISITOR_SPEND_SUMMARY.exists():
+        taiwan_summary = validate_taiwan_official_visitor_spend_summary(
+            TAIWAN_OFFICIAL_VISITOR_SPEND_SUMMARY
+        )
+        taiwan_summary_message = f", {len(taiwan_summary)} Taiwan spend summary rows"
+    else:
+        taiwan_summary_message = ", Taiwan spend summary not yet populated"
+
     print(
         "Japan/Taiwan validation scaffold checks passed "
         f"({len(basket)} basket rows, {len(sources)} source rows"
-        f"{spend_message}{length_message}{per_day_message}{summary_message})."
+        f"{spend_message}{length_message}{per_day_message}{summary_message}"
+        f"{taiwan_spend_message}{taiwan_length_message}{taiwan_per_day_message}"
+        f"{taiwan_summary_message})."
     )
 
 

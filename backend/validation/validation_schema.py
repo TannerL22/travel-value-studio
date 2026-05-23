@@ -38,6 +38,7 @@ PRICE_STATUS_VALUES = {
 }
 
 DATA_GRANULARITY_VALUES = {
+    "survey_headline_spend",
     "survey_category_spend",
     "average_length_of_stay",
     "derived_per_day_spend",
@@ -119,6 +120,73 @@ JAPAN_OFFICIAL_VISITOR_SPEND_SUMMARY_REQUIRED_COLUMNS: List[str] = [
     "food_drink_per_day_jpy",
     "local_transport_per_day_jpy",
     "shopping_per_day_jpy",
+    "notes",
+]
+
+TAIWAN_OFFICIAL_VISITOR_SPEND_REQUIRED_COLUMNS: List[str] = [
+    "country",
+    "source_name",
+    "source_url",
+    "source_file",
+    "period",
+    "visitor_origin_market",
+    "spend_category",
+    "spend_value_local",
+    "local_currency",
+    "spend_value_usd",
+    "spend_basis",
+    "data_granularity",
+    "observation_date",
+    "source_confidence",
+    "notes",
+]
+
+TAIWAN_OFFICIAL_LENGTH_OF_STAY_REQUIRED_COLUMNS: List[str] = [
+    "country",
+    "source_name",
+    "source_url",
+    "source_file",
+    "period",
+    "visitor_origin_market",
+    "length_of_stay_days",
+    "stay_basis",
+    "data_granularity",
+    "observation_date",
+    "source_confidence",
+    "notes",
+]
+
+TAIWAN_OFFICIAL_VISITOR_SPEND_PER_DAY_REQUIRED_COLUMNS: List[str] = [
+    "country",
+    "period",
+    "visitor_origin_market",
+    "spend_category",
+    "spend_value_local_per_trip",
+    "length_of_stay_days",
+    "spend_value_local_per_day",
+    "local_currency",
+    "spend_value_usd_per_trip",
+    "spend_value_usd_per_day",
+    "spend_basis",
+    "data_granularity",
+    "source_name",
+    "source_url",
+    "source_file",
+    "source_confidence",
+    "notes",
+]
+
+TAIWAN_OFFICIAL_VISITOR_SPEND_SUMMARY_REQUIRED_COLUMNS: List[str] = [
+    "visitor_origin_market",
+    "total_spend_per_trip_twd",
+    "length_of_stay_days",
+    "total_spend_per_day_twd",
+    "total_spend_per_trip_usd",
+    "total_spend_per_day_usd",
+    "accommodation_per_day_twd",
+    "food_drink_per_day_twd",
+    "local_transport_per_day_twd",
+    "shopping_per_day_twd",
     "notes",
 ]
 
@@ -286,5 +354,97 @@ def validate_japan_official_visitor_spend_summary(path: str | Path) -> pd.DataFr
             "shopping_per_day_jpy",
         ],
         "Japan official visitor spend summary",
+    )
+    return df
+
+
+def validate_taiwan_official_visitor_spend(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        TAIWAN_OFFICIAL_VISITOR_SPEND_REQUIRED_COLUMNS,
+        "Taiwan official visitor spend",
+    )
+    _validate_allowed_values(
+        df,
+        "data_granularity",
+        DATA_GRANULARITY_VALUES,
+        "Taiwan official visitor spend",
+    )
+    _validate_non_negative_numeric(
+        df,
+        ["spend_value_local", "spend_value_usd"],
+        "Taiwan official visitor spend",
+    )
+    return df
+
+
+def validate_taiwan_official_length_of_stay(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        TAIWAN_OFFICIAL_LENGTH_OF_STAY_REQUIRED_COLUMNS,
+        "Taiwan official length of stay",
+    )
+    _validate_allowed_values(
+        df,
+        "data_granularity",
+        DATA_GRANULARITY_VALUES,
+        "Taiwan official length of stay",
+    )
+    _validate_non_negative_numeric(
+        df, ["length_of_stay_days"], "Taiwan official length of stay"
+    )
+    return df
+
+
+def validate_taiwan_official_visitor_spend_per_day(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        TAIWAN_OFFICIAL_VISITOR_SPEND_PER_DAY_REQUIRED_COLUMNS,
+        "Taiwan official visitor spend per day",
+    )
+    _validate_allowed_values(
+        df,
+        "data_granularity",
+        DATA_GRANULARITY_VALUES,
+        "Taiwan official visitor spend per day",
+    )
+    _validate_non_negative_numeric(
+        df,
+        [
+            "spend_value_local_per_trip",
+            "length_of_stay_days",
+            "spend_value_local_per_day",
+            "spend_value_usd_per_trip",
+            "spend_value_usd_per_day",
+        ],
+        "Taiwan official visitor spend per day",
+    )
+    return df
+
+
+def validate_taiwan_official_visitor_spend_summary(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        TAIWAN_OFFICIAL_VISITOR_SPEND_SUMMARY_REQUIRED_COLUMNS,
+        "Taiwan official visitor spend summary",
+    )
+    _validate_non_negative_numeric(
+        df,
+        [
+            "total_spend_per_trip_twd",
+            "length_of_stay_days",
+            "total_spend_per_day_twd",
+            "total_spend_per_trip_usd",
+            "total_spend_per_day_usd",
+            "accommodation_per_day_twd",
+            "food_drink_per_day_twd",
+            "local_transport_per_day_twd",
+            "shopping_per_day_twd",
+        ],
+        "Taiwan official visitor spend summary",
     )
     return df
