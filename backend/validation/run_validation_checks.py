@@ -10,6 +10,7 @@ from validation_schema import (
     validate_japan_official_visitor_spend_per_day,
     validate_japan_official_visitor_spend_summary,
     validate_japan_taiwan_model_validation_template,
+    validate_japan_taiwan_official_comparison_fx_normalized,
     validate_japan_taiwan_official_comparison_summary,
     validate_japan_taiwan_official_comparison_usd,
     validate_source_register,
@@ -17,6 +18,7 @@ from validation_schema import (
     validate_taiwan_official_visitor_spend,
     validate_taiwan_official_visitor_spend_per_day,
     validate_taiwan_official_visitor_spend_summary,
+    validate_validation_fx_rates,
 )
 
 
@@ -44,6 +46,10 @@ JAPAN_TAIWAN_OFFICIAL_COMPARISON_SUMMARY = (
 )
 JAPAN_TAIWAN_OFFICIAL_COMPARISON_USD = (
     VALIDATION_DIR / "japan_taiwan_official_comparison_usd.csv"
+)
+VALIDATION_FX_RATES = VALIDATION_DIR / "validation_fx_rates.csv"
+JAPAN_TAIWAN_OFFICIAL_COMPARISON_FX_NORMALIZED = (
+    VALIDATION_DIR / "japan_taiwan_official_comparison_fx_normalized.csv"
 )
 JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE = (
     VALIDATION_DIR / "japan_taiwan_model_validation_template.csv"
@@ -136,6 +142,20 @@ def main() -> None:
     else:
         comparison_usd_message = ", USD comparison not yet populated"
 
+    if VALIDATION_FX_RATES.exists():
+        fx_rates = validate_validation_fx_rates(VALIDATION_FX_RATES)
+        fx_rates_message = f", {len(fx_rates)} validation FX rows"
+    else:
+        fx_rates_message = ", validation FX rates not yet populated"
+
+    if JAPAN_TAIWAN_OFFICIAL_COMPARISON_FX_NORMALIZED.exists():
+        fx_normalized = validate_japan_taiwan_official_comparison_fx_normalized(
+            JAPAN_TAIWAN_OFFICIAL_COMPARISON_FX_NORMALIZED
+        )
+        fx_normalized_message = f", {len(fx_normalized)} FX-normalized comparison rows"
+    else:
+        fx_normalized_message = ", FX-normalized comparison not yet populated"
+
     if JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE.exists():
         model_template = validate_japan_taiwan_model_validation_template(
             JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE,
@@ -153,7 +173,8 @@ def main() -> None:
         f"{spend_message}{length_message}{per_day_message}{summary_message}"
         f"{taiwan_spend_message}{taiwan_length_message}{taiwan_per_day_message}"
         f"{taiwan_summary_message}{comparison_summary_message}"
-        f"{comparison_usd_message}{model_template_message})."
+        f"{comparison_usd_message}{fx_rates_message}{fx_normalized_message}"
+        f"{model_template_message})."
     )
 
 

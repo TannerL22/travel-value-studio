@@ -139,7 +139,9 @@ This scaffold does not prove whether Japan or Taiwan is better value yet. It inc
 - `taiwan_official_visitor_spend_per_day.csv`: officially reported Taiwan per-day spend values, with TWD category values derived from the report's official exchange-rate note where needed.
 - `taiwan_official_visitor_spend_summary.csv`: compact Taiwan Total-market summary.
 - `japan_taiwan_official_comparison_summary.csv`: first official local-currency comparison across fields available for both countries.
-- `japan_taiwan_official_comparison_usd.csv`: USD-normalized comparison scaffold; Taiwan USD values are populated, while Japan USD values remain pending a documented annual JPY/USD conversion.
+- `validation_fx_rates.csv`: documented annual-average FRED G.5A FX rates used for validation conversion.
+- `japan_taiwan_official_comparison_usd.csv`: USD-normalized comparison using FRED annual FX for Japan and official Taiwan USD values cross-checked to FRED.
+- `japan_taiwan_official_comparison_fx_normalized.csv`: primary annual-FX-normalized USD/GBP comparison across comparable official spend fields.
 - `japan_taiwan_model_validation_template.csv`: join target for backend model outputs and official spend/day evidence.
 - `japan_taiwan_model_validation_notes.md`: cautious interpretation notes for using official spend evidence against model outputs.
 - `taiwan_data_collection_notes.md`: official Taiwan pages inspected, parsing notes, and remaining Taiwan data gaps.
@@ -148,7 +150,7 @@ This scaffold does not prove whether Japan or Taiwan is better value yet. It inc
 
 Japan and Taiwan official data collection has started. Japan spend has approximate per-day normalization using official average nights where origin markets match. Taiwan headline spend and stay data is populated from the official 2024 Tourism Administration summary PDF, with broad category-level per-day values for Total visitors. The official comparison summary now compares only fields that exist cleanly for both countries. USD-normalized comparison depends on a documented Japan FX conversion.
 
-The first populated `GBR` model-validation run is recorded. Japan now remains in scored output when WGI stability is missing, using a neutral safety/stability component while keeping the `missing_stability` quality flag. Taiwan is included as an explicit supplemental model row because WDI omits `TWN`; IMF macro values, official Taiwan 2024 arrivals/FX, and a marked GDP PPP proxy fill the minimum fields needed for comparison. The first signal is `model_direction_mismatch_current_fx`: the model estimates Taiwan cheaper than Japan for GBP-origin travel, while official spend/day points Japan lower than Taiwan under the current backend FX conversion. This still does not prove whether Japan or Taiwan is better value; annual FX normalization and category mapping remain imperfect.
+The first populated `GBR` model-validation run is recorded. Japan now remains in scored output when WGI stability is missing, using a neutral safety/stability component while keeping the `missing_stability` quality flag. Taiwan is included as an explicit supplemental model row because WDI omits `TWN`; IMF macro values, official Taiwan 2024 arrivals/FX, and a marked GDP PPP proxy fill the minimum fields needed for comparison. Annual-average FX normalization now uses FRED G.5A series (`AEXJPUS`, `AEXTAUS`, and `AEXUSUK`) as the primary official-comparison basis; current backend FX is treated as sensitivity context only. The current signal is `model_direction_mismatch_annual_fx`: the model estimates Taiwan cheaper than Japan for GBP-origin travel, while official visitor-spend/day remains higher for Taiwan than Japan under annual-average FX normalization. This should be interpreted cautiously because periods and category mappings remain imperfect.
 
 ## Notes
 

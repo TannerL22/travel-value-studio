@@ -215,6 +215,43 @@ JAPAN_TAIWAN_OFFICIAL_COMPARISON_USD_REQUIRED_COLUMNS: List[str] = [
     "notes",
 ]
 
+VALIDATION_FX_RATES_REQUIRED_COLUMNS: List[str] = [
+    "fx_rate_id",
+    "source_name",
+    "source_url",
+    "period",
+    "base_currency",
+    "quote_currency",
+    "rate",
+    "rate_direction",
+    "frequency",
+    "source_confidence",
+    "notes",
+]
+
+JAPAN_TAIWAN_OFFICIAL_COMPARISON_FX_NORMALIZED_REQUIRED_COLUMNS: List[str] = [
+    "metric",
+    "japan_value_local",
+    "japan_currency",
+    "japan_period",
+    "japan_fx_rate_to_usd",
+    "japan_fx_rate_source",
+    "japan_value_usd",
+    "japan_value_gbp",
+    "taiwan_value_local",
+    "taiwan_currency",
+    "taiwan_period",
+    "taiwan_fx_rate_to_usd",
+    "taiwan_fx_rate_source",
+    "taiwan_value_usd",
+    "taiwan_value_gbp",
+    "taiwan_minus_japan_usd",
+    "taiwan_vs_japan_pct_usd",
+    "taiwan_minus_japan_gbp",
+    "comparability",
+    "notes",
+]
+
 JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE_REQUIRED_COLUMNS: List[str] = [
     "origin_iso3",
     "origin_currency",
@@ -298,6 +335,16 @@ def _validate_non_negative_numeric(df: pd.DataFrame, columns: List[str], label: 
         if negative.any():
             rows = ", ".join(str(i + 2) for i in df.index[negative])
             raise ValueError(f"{label} has negative {column} values (CSV rows: {rows})")
+
+
+def _validate_numeric(df: pd.DataFrame, columns: List[str], label: str) -> None:
+    for column in columns:
+        values = pd.to_numeric(df[column], errors="coerce")
+        populated = df[column].astype(str).str.strip() != ""
+        invalid = populated & values.isna()
+        if invalid.any():
+            rows = ", ".join(str(i + 2) for i in df.index[invalid])
+            raise ValueError(f"{label} has non-numeric {column} values (CSV rows: {rows})")
 
 
 def validate_basket_template(path: str | Path) -> pd.DataFrame:
@@ -542,10 +589,62 @@ def validate_japan_taiwan_official_comparison_usd(path: str | Path) -> pd.DataFr
         [
             "japan_value_usd",
             "taiwan_value_usd",
+        ],
+        "Japan/Taiwan official comparison USD",
+    )
+    _validate_numeric(
+        df,
+        [
             "taiwan_minus_japan_usd",
             "taiwan_vs_japan_pct",
         ],
         "Japan/Taiwan official comparison USD",
+    )
+    return df
+
+
+def validate_validation_fx_rates(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        VALIDATION_FX_RATES_REQUIRED_COLUMNS,
+        "Validation FX rates",
+    )
+    _validate_non_negative_numeric(df, ["period", "rate"], "Validation FX rates")
+    return df
+
+
+def validate_japan_taiwan_official_comparison_fx_normalized(
+    path: str | Path,
+) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        JAPAN_TAIWAN_OFFICIAL_COMPARISON_FX_NORMALIZED_REQUIRED_COLUMNS,
+        "Japan/Taiwan official comparison FX-normalized",
+    )
+    _validate_non_negative_numeric(
+        df,
+        [
+            "japan_value_local",
+            "japan_fx_rate_to_usd",
+            "japan_value_usd",
+            "japan_value_gbp",
+            "taiwan_value_local",
+            "taiwan_fx_rate_to_usd",
+            "taiwan_value_usd",
+            "taiwan_value_gbp",
+        ],
+        "Japan/Taiwan official comparison FX-normalized",
+    )
+    _validate_numeric(
+        df,
+        [
+            "taiwan_minus_japan_usd",
+            "taiwan_vs_japan_pct_usd",
+            "taiwan_minus_japan_gbp",
+        ],
+        "Japan/Taiwan official comparison FX-normalized",
     )
     return df
 
