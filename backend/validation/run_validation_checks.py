@@ -15,6 +15,9 @@ from validation_schema import (
     validate_japan_taiwan_official_comparison_fx_normalized,
     validate_japan_taiwan_official_comparison_summary,
     validate_japan_taiwan_official_comparison_usd,
+    validate_japan_taiwan_sensitivity_results,
+    validate_japan_taiwan_sensitivity_scenarios,
+    validate_japan_taiwan_sensitivity_summary,
     validate_source_register,
     validate_taiwan_official_length_of_stay,
     validate_taiwan_official_visitor_spend,
@@ -61,6 +64,15 @@ JAPAN_TAIWAN_MODEL_DRIVER_DIAGNOSTICS = (
 )
 JAPAN_TAIWAN_MODEL_DRIVER_DELTA = (
     VALIDATION_DIR / "japan_taiwan_model_driver_delta.csv"
+)
+JAPAN_TAIWAN_SENSITIVITY_SCENARIOS = (
+    VALIDATION_DIR / "japan_taiwan_sensitivity_scenarios.csv"
+)
+JAPAN_TAIWAN_SENSITIVITY_RESULTS = (
+    VALIDATION_DIR / "japan_taiwan_sensitivity_results.csv"
+)
+JAPAN_TAIWAN_SENSITIVITY_SUMMARY = (
+    VALIDATION_DIR / "japan_taiwan_sensitivity_summary.csv"
 )
 
 
@@ -191,6 +203,36 @@ def main() -> None:
     else:
         model_delta_message = ", model driver delta not yet populated"
 
+    if JAPAN_TAIWAN_SENSITIVITY_SCENARIOS.exists():
+        sensitivity_scenarios = validate_japan_taiwan_sensitivity_scenarios(
+            JAPAN_TAIWAN_SENSITIVITY_SCENARIOS
+        )
+        sensitivity_scenarios_message = (
+            f", {len(sensitivity_scenarios)} sensitivity scenarios"
+        )
+    else:
+        sensitivity_scenarios_message = ", sensitivity scenarios not yet populated"
+
+    if JAPAN_TAIWAN_SENSITIVITY_RESULTS.exists():
+        sensitivity_results = validate_japan_taiwan_sensitivity_results(
+            JAPAN_TAIWAN_SENSITIVITY_RESULTS
+        )
+        sensitivity_results_message = (
+            f", {len(sensitivity_results)} sensitivity result rows"
+        )
+    else:
+        sensitivity_results_message = ", sensitivity results not yet populated"
+
+    if JAPAN_TAIWAN_SENSITIVITY_SUMMARY.exists():
+        sensitivity_summary = validate_japan_taiwan_sensitivity_summary(
+            JAPAN_TAIWAN_SENSITIVITY_SUMMARY
+        )
+        sensitivity_summary_message = (
+            f", {len(sensitivity_summary)} sensitivity summary rows"
+        )
+    else:
+        sensitivity_summary_message = ", sensitivity summary not yet populated"
+
     print(
         "Japan/Taiwan validation scaffold checks passed "
         f"({len(basket)} basket rows, {len(sources)} source rows"
@@ -198,7 +240,9 @@ def main() -> None:
         f"{taiwan_spend_message}{taiwan_length_message}{taiwan_per_day_message}"
         f"{taiwan_summary_message}{comparison_summary_message}"
         f"{comparison_usd_message}{fx_rates_message}{fx_normalized_message}"
-        f"{model_template_message}{model_drivers_message}{model_delta_message})."
+        f"{model_template_message}{model_drivers_message}{model_delta_message}"
+        f"{sensitivity_scenarios_message}{sensitivity_results_message}"
+        f"{sensitivity_summary_message})."
     )
 
 

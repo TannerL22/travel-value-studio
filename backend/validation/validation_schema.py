@@ -322,6 +322,68 @@ JAPAN_TAIWAN_MODEL_DRIVER_DELTA_REQUIRED_COLUMNS: List[str] = [
     "confidence",
 ]
 
+JAPAN_TAIWAN_SENSITIVITY_SCENARIOS_REQUIRED_COLUMNS: List[str] = [
+    "scenario_id",
+    "scenario_label",
+    "description",
+    "budget_sens",
+    "comfort",
+    "supply_need",
+    "risk_pri",
+    "scarcity_k",
+    "ppp_advantage_adjustment",
+    "fx_component_adjustment",
+    "tourism_depth_adjustment",
+    "notes",
+]
+
+JAPAN_TAIWAN_SENSITIVITY_RESULTS_REQUIRED_COLUMNS: List[str] = [
+    "scenario_id",
+    "scenario_label",
+    "origin_iso3",
+    "origin_currency",
+    "destination_iso3",
+    "destination_country",
+    "model_rank",
+    "model_score",
+    "model_est_daily_cost_origin_currency",
+    "model_value_multiplier_relative",
+    "component_fx_tailwind",
+    "component_fx_tailwind_source",
+    "component_ppp_advantage",
+    "component_comfort_floor",
+    "component_tourism_depth",
+    "component_safety_stability",
+    "tourism_pp_power",
+    "score_tourism_cost",
+    "score_infra",
+    "score_safety",
+    "data_quality_score",
+    "data_quality_grade",
+    "data_quality_flags",
+    "diagnostic_adjusted_score",
+    "diagnostic_adjusted_est_daily_cost",
+    "diagnostic_adjustment_notes",
+    "notes",
+]
+
+JAPAN_TAIWAN_SENSITIVITY_SUMMARY_REQUIRED_COLUMNS: List[str] = [
+    "scenario_id",
+    "scenario_label",
+    "japan_model_est_daily_cost_gbp",
+    "taiwan_model_est_daily_cost_gbp",
+    "taiwan_minus_japan_model_cost_gbp",
+    "japan_diagnostic_adjusted_cost_gbp",
+    "taiwan_diagnostic_adjusted_cost_gbp",
+    "taiwan_minus_japan_adjusted_cost_gbp",
+    "japan_diagnostic_adjusted_score",
+    "taiwan_diagnostic_adjusted_score",
+    "model_preference",
+    "official_spend_day_preference",
+    "mismatch_persists",
+    "interpretation",
+]
+
 MODEL_VALIDATION_REQUIRED_MODEL_COLUMNS: List[str] = [
     "model_score",
     "model_est_daily_cost_origin_currency",
@@ -793,5 +855,91 @@ def validate_japan_taiwan_model_driver_delta(path: str | Path) -> pd.DataFrame:
         df,
         ["japan_value", "taiwan_value", "taiwan_minus_japan"],
         "Japan/Taiwan model driver delta",
+    )
+    return df
+
+
+def validate_japan_taiwan_sensitivity_scenarios(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        JAPAN_TAIWAN_SENSITIVITY_SCENARIOS_REQUIRED_COLUMNS,
+        "Japan/Taiwan sensitivity scenarios",
+    )
+    _validate_non_negative_numeric(
+        df,
+        [
+            "budget_sens",
+            "comfort",
+            "supply_need",
+            "risk_pri",
+            "scarcity_k",
+            "ppp_advantage_adjustment",
+            "fx_component_adjustment",
+            "tourism_depth_adjustment",
+        ],
+        "Japan/Taiwan sensitivity scenarios",
+    )
+    return df
+
+
+def validate_japan_taiwan_sensitivity_results(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        JAPAN_TAIWAN_SENSITIVITY_RESULTS_REQUIRED_COLUMNS,
+        "Japan/Taiwan sensitivity results",
+    )
+    _validate_non_negative_numeric(
+        df,
+        [
+            "model_rank",
+            "model_score",
+            "model_est_daily_cost_origin_currency",
+            "model_value_multiplier_relative",
+            "component_fx_tailwind",
+            "component_ppp_advantage",
+            "component_comfort_floor",
+            "component_tourism_depth",
+            "component_safety_stability",
+            "tourism_pp_power",
+            "score_tourism_cost",
+            "score_infra",
+            "score_safety",
+            "data_quality_score",
+            "diagnostic_adjusted_score",
+            "diagnostic_adjusted_est_daily_cost",
+        ],
+        "Japan/Taiwan sensitivity results",
+    )
+    return df
+
+
+def validate_japan_taiwan_sensitivity_summary(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        JAPAN_TAIWAN_SENSITIVITY_SUMMARY_REQUIRED_COLUMNS,
+        "Japan/Taiwan sensitivity summary",
+    )
+    _validate_non_negative_numeric(
+        df,
+        [
+            "japan_model_est_daily_cost_gbp",
+            "taiwan_model_est_daily_cost_gbp",
+            "japan_diagnostic_adjusted_cost_gbp",
+            "taiwan_diagnostic_adjusted_cost_gbp",
+            "japan_diagnostic_adjusted_score",
+            "taiwan_diagnostic_adjusted_score",
+        ],
+        "Japan/Taiwan sensitivity summary",
+    )
+    _validate_numeric(
+        df,
+        [
+            "taiwan_minus_japan_model_cost_gbp",
+            "taiwan_minus_japan_adjusted_cost_gbp",
+        ],
+        "Japan/Taiwan sensitivity summary",
     )
     return df

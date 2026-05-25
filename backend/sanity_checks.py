@@ -11,6 +11,7 @@ from data_sources import (
     resolve_origin_context,
 )
 from source_registry import compute_row_data_quality
+from validation.run_japan_taiwan_sensitivity import apply_diagnostic_adjustments
 
 
 def test_good_row_quality() -> None:
@@ -224,6 +225,98 @@ def test_supplemental_proxy_quality_flags() -> None:
     assert "fx_tailwind_proxy" in flags
 
 
+def test_sensitivity_baseline_adjustment_is_neutral() -> None:
+    row = pd.Series(
+        {
+            "Score": 0.37,
+            "est_daily_cost": 94.94,
+            "score_tourism_cost": 0.4956,
+            "score_infra": 0.6322,
+            "component_fx_tailwind": 33.17,
+        }
+    )
+    scenario = pd.Series(
+        {
+            "scenario_id": "baseline_default",
+            "ppp_advantage_adjustment": 1.0,
+            "fx_component_adjustment": 0.0,
+            "tourism_depth_adjustment": 1.0,
+        }
+    )
+    adjusted = apply_diagnostic_adjustments(row, scenario)
+    assert abs(adjusted["diagnostic_adjusted_score"] - 0.37) < 1e-9
+    assert abs(adjusted["diagnostic_adjusted_est_daily_cost"] - 94.94) < 1e-9
+
+
+def test_sensitivity_proxy_penalty_reduces_proxy_score_advantage() -> None:
+    row = pd.Series(
+        {
+            "Score": 0.37,
+            "est_daily_cost": 94.94,
+            "score_tourism_cost": 0.4956,
+            "score_infra": 0.6322,
+            "component_fx_tailwind": 33.17,
+            "supplemental_model_row": True,
+            "ppp_private_is_gdp_proxy": True,
+            "component_fx_tailwind_source": "model_proxy",
+        }
+    )
+    same_ppp_without_proxy_penalty = pd.Series(
+        {
+            "scenario_id": "baseline_default",
+            "ppp_advantage_adjustment": 0.75,
+            "fx_component_adjustment": 0.0,
+            "tourism_depth_adjustment": 1.0,
+        }
+    )
+    penalty = pd.Series(
+        {
+            "scenario_id": "conservative_taiwan_proxy_penalty",
+            "ppp_advantage_adjustment": 0.75,
+            "fx_component_adjustment": 0.0,
+            "tourism_depth_adjustment": 1.0,
+        }
+    )
+    base = apply_diagnostic_adjustments(row, same_ppp_without_proxy_penalty)
+    penalized = apply_diagnostic_adjustments(row, penalty)
+    assert penalized["diagnostic_adjusted_score"] < base["diagnostic_adjusted_score"]
+    assert (
+        penalized["diagnostic_adjusted_est_daily_cost"]
+        > base["diagnostic_adjusted_est_daily_cost"]
+    )
+
+
+def test_sensitivity_fx_boost_increases_high_fx_score() -> None:
+    row = pd.Series(
+        {
+            "Score": 0.18,
+            "est_daily_cost": 139.78,
+            "score_tourism_cost": 0.3266,
+            "score_infra": 0.5835,
+            "component_fx_tailwind": 94.44,
+        }
+    )
+    neutral = pd.Series(
+        {
+            "scenario_id": "baseline_default",
+            "ppp_advantage_adjustment": 1.0,
+            "fx_component_adjustment": 0.0,
+            "tourism_depth_adjustment": 1.0,
+        }
+    )
+    fx_boost = pd.Series(
+        {
+            "scenario_id": "higher_fx_importance",
+            "ppp_advantage_adjustment": 1.0,
+            "fx_component_adjustment": 0.45,
+            "tourism_depth_adjustment": 1.0,
+        }
+    )
+    base = apply_diagnostic_adjustments(row, neutral)
+    boosted = apply_diagnostic_adjustments(row, fx_boost)
+    assert boosted["diagnostic_adjusted_score"] > base["diagnostic_adjusted_score"]
+
+
 def main() -> None:
     test_good_row_quality()
     test_missing_ppp_fx_quality()
@@ -235,6 +328,9 @@ def main() -> None:
     test_origin_context_uses_raw_dataset()
     test_compute_scores_keeps_missing_stability_row()
     test_supplemental_proxy_quality_flags()
+    test_sensitivity_baseline_adjustment_is_neutral()
+    test_sensitivity_proxy_penalty_reduces_proxy_score_advantage()
+    test_sensitivity_fx_boost_increases_high_fx_score()
     print("Backend sanity checks passed.")
 
 
