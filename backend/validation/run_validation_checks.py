@@ -8,6 +8,9 @@ from validation_schema import (
     validate_japan_official_visitor_spend,
     validate_japan_official_visitor_spend_per_day,
     validate_japan_official_visitor_spend_summary,
+    validate_japan_taiwan_model_validation_template,
+    validate_japan_taiwan_official_comparison_summary,
+    validate_japan_taiwan_official_comparison_usd,
     validate_source_register,
     validate_taiwan_official_length_of_stay,
     validate_taiwan_official_visitor_spend,
@@ -34,6 +37,15 @@ TAIWAN_OFFICIAL_VISITOR_SPEND_PER_DAY = (
 )
 TAIWAN_OFFICIAL_VISITOR_SPEND_SUMMARY = (
     VALIDATION_DIR / "taiwan_official_visitor_spend_summary.csv"
+)
+JAPAN_TAIWAN_OFFICIAL_COMPARISON_SUMMARY = (
+    VALIDATION_DIR / "japan_taiwan_official_comparison_summary.csv"
+)
+JAPAN_TAIWAN_OFFICIAL_COMPARISON_USD = (
+    VALIDATION_DIR / "japan_taiwan_official_comparison_usd.csv"
+)
+JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE = (
+    VALIDATION_DIR / "japan_taiwan_model_validation_template.csv"
 )
 
 
@@ -105,12 +117,39 @@ def main() -> None:
     else:
         taiwan_summary_message = ", Taiwan spend summary not yet populated"
 
+    if JAPAN_TAIWAN_OFFICIAL_COMPARISON_SUMMARY.exists():
+        comparison_summary = validate_japan_taiwan_official_comparison_summary(
+            JAPAN_TAIWAN_OFFICIAL_COMPARISON_SUMMARY
+        )
+        comparison_summary_message = (
+            f", {len(comparison_summary)} official comparison rows"
+        )
+    else:
+        comparison_summary_message = ", official comparison summary not yet populated"
+
+    if JAPAN_TAIWAN_OFFICIAL_COMPARISON_USD.exists():
+        comparison_usd = validate_japan_taiwan_official_comparison_usd(
+            JAPAN_TAIWAN_OFFICIAL_COMPARISON_USD
+        )
+        comparison_usd_message = f", {len(comparison_usd)} USD comparison rows"
+    else:
+        comparison_usd_message = ", USD comparison not yet populated"
+
+    if JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE.exists():
+        model_template = validate_japan_taiwan_model_validation_template(
+            JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE
+        )
+        model_template_message = f", {len(model_template)} model validation rows"
+    else:
+        model_template_message = ", model validation template not yet populated"
+
     print(
         "Japan/Taiwan validation scaffold checks passed "
         f"({len(basket)} basket rows, {len(sources)} source rows"
         f"{spend_message}{length_message}{per_day_message}{summary_message}"
         f"{taiwan_spend_message}{taiwan_length_message}{taiwan_per_day_message}"
-        f"{taiwan_summary_message})."
+        f"{taiwan_summary_message}{comparison_summary_message}"
+        f"{comparison_usd_message}{model_template_message})."
     )
 
 

@@ -138,11 +138,15 @@ This scaffold does not prove whether Japan or Taiwan is better value yet. It inc
 - `taiwan_official_length_of_stay.csv`: Taiwan Tourism Administration 2024 average stay from the official survey summary PDF.
 - `taiwan_official_visitor_spend_per_day.csv`: officially reported Taiwan per-day spend values, with TWD category values derived from the report's official exchange-rate note where needed.
 - `taiwan_official_visitor_spend_summary.csv`: compact Taiwan Total-market summary.
+- `japan_taiwan_official_comparison_summary.csv`: first official local-currency comparison across fields available for both countries.
+- `japan_taiwan_official_comparison_usd.csv`: USD-normalized comparison scaffold; Taiwan USD values are populated, while Japan USD values remain pending a documented annual JPY/USD conversion.
+- `japan_taiwan_model_validation_template.csv`: join target for backend model outputs and official spend/day evidence.
+- `japan_taiwan_model_validation_notes.md`: cautious interpretation notes for using official spend evidence against model outputs.
 - `taiwan_data_collection_notes.md`: official Taiwan pages inspected, parsing notes, and remaining Taiwan data gaps.
 - `japan_data_collection_notes.md`: official pages inspected, parsing notes, and remaining Japan data gaps.
 - `validation_schema.py` and `run_validation_checks.py`: lightweight pandas checks for required columns, observed-row source/price fields, and the Japan official spend file when present.
 
-Japan and Taiwan official data collection has started. Japan spend has approximate per-day normalization using official average nights where origin markets match. Taiwan headline spend and stay data is populated from the official 2024 Tourism Administration summary PDF, with broad category-level per-day values for Total visitors. Taiwan origin-market/category detail remains pending because the detailed PDF needs a careful table-parsing pass. This still does not prove whether Japan or Taiwan is better value; the comparison is not complete until category mapping is made comparable.
+Japan and Taiwan official data collection has started. Japan spend has approximate per-day normalization using official average nights where origin markets match. Taiwan headline spend and stay data is populated from the official 2024 Tourism Administration summary PDF, with broad category-level per-day values for Total visitors. The official comparison summary now compares only fields that exist cleanly for both countries. USD-normalized comparison depends on a documented Japan FX conversion, and model-output validation remains a scaffold until backend ranking outputs are joined. This still does not prove whether Japan or Taiwan is better value; category mapping remains imperfect.
 
 ## Notes
 

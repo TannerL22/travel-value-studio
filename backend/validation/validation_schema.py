@@ -190,6 +190,52 @@ TAIWAN_OFFICIAL_VISITOR_SPEND_SUMMARY_REQUIRED_COLUMNS: List[str] = [
     "notes",
 ]
 
+JAPAN_TAIWAN_OFFICIAL_COMPARISON_SUMMARY_REQUIRED_COLUMNS: List[str] = [
+    "metric",
+    "japan_value",
+    "japan_currency",
+    "japan_basis",
+    "taiwan_value",
+    "taiwan_currency",
+    "taiwan_basis",
+    "comparison_direction",
+    "comparability",
+    "notes",
+]
+
+JAPAN_TAIWAN_OFFICIAL_COMPARISON_USD_REQUIRED_COLUMNS: List[str] = [
+    "metric",
+    "japan_value_usd",
+    "taiwan_value_usd",
+    "japan_source_basis",
+    "taiwan_source_basis",
+    "taiwan_minus_japan_usd",
+    "taiwan_vs_japan_pct",
+    "comparability",
+    "notes",
+]
+
+JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE_REQUIRED_COLUMNS: List[str] = [
+    "origin_iso3",
+    "origin_currency",
+    "destination_iso3",
+    "destination_country",
+    "model_score",
+    "model_est_daily_cost_origin_currency",
+    "model_value_multiplier_relative",
+    "component_fx_tailwind",
+    "component_fx_tailwind_source",
+    "component_ppp_advantage",
+    "component_comfort_floor",
+    "component_tourism_depth",
+    "component_safety_stability",
+    "official_spend_per_day_local",
+    "official_spend_per_day_usd",
+    "official_spend_basis",
+    "validation_signal",
+    "notes",
+]
+
 
 def _read_csv(path: str | Path) -> pd.DataFrame:
     resolved = Path(path)
@@ -446,5 +492,66 @@ def validate_taiwan_official_visitor_spend_summary(path: str | Path) -> pd.DataF
             "shopping_per_day_twd",
         ],
         "Taiwan official visitor spend summary",
+    )
+    return df
+
+
+def validate_japan_taiwan_official_comparison_summary(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        JAPAN_TAIWAN_OFFICIAL_COMPARISON_SUMMARY_REQUIRED_COLUMNS,
+        "Japan/Taiwan official comparison summary",
+    )
+    _validate_non_negative_numeric(
+        df,
+        ["japan_value", "taiwan_value"],
+        "Japan/Taiwan official comparison summary",
+    )
+    return df
+
+
+def validate_japan_taiwan_official_comparison_usd(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        JAPAN_TAIWAN_OFFICIAL_COMPARISON_USD_REQUIRED_COLUMNS,
+        "Japan/Taiwan official comparison USD",
+    )
+    _validate_non_negative_numeric(
+        df,
+        [
+            "japan_value_usd",
+            "taiwan_value_usd",
+            "taiwan_minus_japan_usd",
+            "taiwan_vs_japan_pct",
+        ],
+        "Japan/Taiwan official comparison USD",
+    )
+    return df
+
+
+def validate_japan_taiwan_model_validation_template(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE_REQUIRED_COLUMNS,
+        "Japan/Taiwan model validation template",
+    )
+    _validate_non_negative_numeric(
+        df,
+        [
+            "model_score",
+            "model_est_daily_cost_origin_currency",
+            "model_value_multiplier_relative",
+            "component_fx_tailwind",
+            "component_ppp_advantage",
+            "component_comfort_floor",
+            "component_tourism_depth",
+            "component_safety_stability",
+            "official_spend_per_day_local",
+            "official_spend_per_day_usd",
+        ],
+        "Japan/Taiwan model validation template",
     )
     return df
