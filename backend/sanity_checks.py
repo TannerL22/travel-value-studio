@@ -5,6 +5,7 @@ import pandas as pd
 
 from data_sources import (
     add_origin_fx_tailwind_diagnostics,
+    compute_scores,
     compute_fx_tailwind_ratio_from_usd_rates,
     promote_origin_fx_tailwind_component,
     resolve_origin_context,
@@ -165,6 +166,64 @@ def test_origin_context_uses_raw_dataset() -> None:
     assert fallback["origin_fallback_used"] is True
 
 
+def test_compute_scores_keeps_missing_stability_row() -> None:
+    df = pd.DataFrame(
+        [
+            {
+                "iso3": "JPN",
+                "country": "Japan",
+                "gdp_nom_pc_usd": 40_000.0,
+                "gdp_ppp_pc_int": 55_000.0,
+                "tourism_pp_power": 1.2,
+                "intl_arrivals": 25_000_000,
+                "wgi_political_stability": np.nan,
+                "fx_lcu_per_usd_live": 150.0,
+                "fx_source": "FRANKFURTER",
+                "fx_tailwind_signal": 0.9,
+            },
+            {
+                "iso3": "USA",
+                "country": "United States",
+                "gdp_nom_pc_usd": 80_000.0,
+                "gdp_ppp_pc_int": 80_000.0,
+                "tourism_pp_power": 1.0,
+                "intl_arrivals": 60_000_000,
+                "wgi_political_stability": 0.0,
+                "fx_lcu_per_usd_live": 1.0,
+                "fx_source": "FRANKFURTER",
+                "fx_tailwind_signal": 0.5,
+            },
+        ]
+    )
+    scored = compute_scores(df)
+    japan = scored[scored["iso3"] == "JPN"]
+    assert len(japan) == 1
+    assert japan.iloc[0]["component_safety_stability"] == 50.0
+
+
+def test_supplemental_proxy_quality_flags() -> None:
+    quality = compute_row_data_quality(
+        {
+            "ppp_private_lcu_per_int": 14.1,
+            "fx_lcu_per_usd": 32.108,
+            "fx_source": "TTA_2024_AVG",
+            "ppp_private_is_nowcast": False,
+            "ppp_private_is_gdp_proxy": True,
+            "supplemental_model_row": True,
+            "intl_arrivals": 7_857_686,
+            "wgi_political_stability": None,
+            "currency": "TWD",
+            "component_fx_tailwind_source": "model_proxy",
+            "fx_tailwind_source": "UNAVAILABLE",
+        }
+    )
+    flags = set(quality["data_quality_flags"])
+    assert "ppp_private_gdp_proxy" in flags
+    assert "supplemental_model_row" in flags
+    assert "missing_stability" in flags
+    assert "fx_tailwind_proxy" in flags
+
+
 def main() -> None:
     test_good_row_quality()
     test_missing_ppp_fx_quality()
@@ -174,6 +233,8 @@ def main() -> None:
     test_fx_component_falls_back_to_usd_history()
     test_fx_component_falls_back_to_model_proxy()
     test_origin_context_uses_raw_dataset()
+    test_compute_scores_keeps_missing_stability_row()
+    test_supplemental_proxy_quality_flags()
     print("Backend sanity checks passed.")
 
 

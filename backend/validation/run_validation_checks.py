@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from validation_schema import (
@@ -137,7 +138,10 @@ def main() -> None:
 
     if JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE.exists():
         model_template = validate_japan_taiwan_model_validation_template(
-            JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE
+            JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE,
+            require_populated_model=(
+                os.getenv("MODEL_VALIDATION_REQUIRE_POPULATED", "").strip() == "1"
+            ),
         )
         model_template_message = f", {len(model_template)} model validation rows"
     else:

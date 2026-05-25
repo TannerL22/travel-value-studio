@@ -236,6 +236,25 @@ JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE_REQUIRED_COLUMNS: List[str] = [
     "notes",
 ]
 
+MODEL_VALIDATION_REQUIRED_MODEL_COLUMNS: List[str] = [
+    "model_score",
+    "model_est_daily_cost_origin_currency",
+    "model_value_multiplier_relative",
+    "component_fx_tailwind",
+    "component_fx_tailwind_source",
+    "component_ppp_advantage",
+    "component_comfort_floor",
+    "component_tourism_depth",
+    "component_safety_stability",
+]
+
+MODEL_VALIDATION_ALLOW_BLANK_SIGNALS = {
+    "model_output_pending",
+    "model_output_missing",
+    "official_data_pending",
+    "not_comparable",
+}
+
 
 def _read_csv(path: str | Path) -> pd.DataFrame:
     resolved = Path(path)
@@ -531,7 +550,10 @@ def validate_japan_taiwan_official_comparison_usd(path: str | Path) -> pd.DataFr
     return df
 
 
-def validate_japan_taiwan_model_validation_template(path: str | Path) -> pd.DataFrame:
+def validate_japan_taiwan_model_validation_template(
+    path: str | Path,
+    require_populated_model: bool = False,
+) -> pd.DataFrame:
     df = _read_csv(path)
     _validate_required_columns(
         df,
@@ -554,4 +576,15 @@ def validate_japan_taiwan_model_validation_template(path: str | Path) -> pd.Data
         ],
         "Japan/Taiwan model validation template",
     )
+    if require_populated_model:
+        pending = df["validation_signal"].isin(MODEL_VALIDATION_ALLOW_BLANK_SIGNALS)
+        check_rows = ~pending
+        for column in MODEL_VALIDATION_REQUIRED_MODEL_COLUMNS:
+            missing = check_rows & (df[column].astype(str).str.strip() == "")
+            if missing.any():
+                rows = ", ".join(str(i + 2) for i in df.index[missing])
+                raise ValueError(
+                    "Japan/Taiwan model validation template has populated "
+                    f"validation_signal rows missing {column} (CSV rows: {rows})"
+                )
     return df

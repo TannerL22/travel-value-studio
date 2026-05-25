@@ -37,6 +37,26 @@ Use `japan_taiwan_official_comparison_summary.csv` to understand what official e
 
 A warning sign would be: the model says Japan is much cheaper because of FX, while official spend/day is similar to or higher than Taiwan after documented currency normalization. Another warning sign would be model-estimated daily cost moving opposite to official spend/day without a clear category or visitor-mix explanation.
 
-## Next Population Step
+## GBR Model Run - 2026-05-25
 
-Run backend rankings for a defined origin, likely `GBR` / `GBP`, capture model rows for Japan and Taiwan, then fill the model component columns in `japan_taiwan_model_validation_template.csv`. Keep model-output validation separate from scoring changes until the comparison exposes a concrete issue.
+The backend model was run locally using the same scoring functions as `/api/rankings` with `origin_iso3 = GBR` and the default ranking parameters. The origin resolved cleanly:
+
+- `origin_used`: `GBR`
+- `origin_currency`: `GBP`
+- `origin_pp_multiplier`: `1.0777393848375492`
+
+The model now produces comparable Japan/Taiwan rows:
+
+- Japan (`JPN`) rank 119, score `0.18`, estimated daily cost `139.7764 GBP`, FX Tailwind source `origin_historical_fx`.
+- Taiwan (`TWN`) rank 102, score `0.37`, estimated daily cost `94.9412 GBP`, FX Tailwind source `model_proxy`.
+
+Two backend coverage fixes were needed before the comparison could run:
+
+- Missing WGI political-stability values now receive a neutral model component of `50.0` instead of dropping otherwise usable rows. The data-quality layer still flags `missing_stability`.
+- Taiwan is added as an explicit supplemental model row because WDI omits `TWN`. IMF macro fields populate GDP/PPP where available; Taiwan's official 2024 arrivals and average FX fill validation-backed gaps. Taiwan's private PPP field is marked as a GDP PPP proxy, not an observed private-consumption PPP value.
+
+The first populated validation signal is `model_direction_mismatch_current_fx` for both rows. The model says Taiwan is cheaper than Japan for a GBP-origin traveler. Official visitor spend/day points the other way under the currently documented conversion: Japan is about `151.20 USD/day` using backend Frankfurter JPY/USD `158.93` from 2026-05-25, while Taiwan is reported at `182.83 USD/day` in the official 2024 Taiwan summary.
+
+This is a warning signal, not a conclusion. Japan's USD conversion uses current backend FX rather than a documented 2025 annual-average JPY/USD rate, Japan and Taiwan periods differ, and official visitor spend/day reflects visitor mix and trip behavior rather than a controlled item basket. Taiwan's model row also has lower confidence because it is supplemental, uses a GDP PPP proxy, lacks WGI stability, and lacks historical origin-aware FX.
+
+Populated model-output validation can now run in stricter mode by setting `MODEL_VALIDATION_REQUIRE_POPULATED=1` before `python backend/validation/run_validation_checks.py`. Rows marked `model_output_missing`, `model_output_pending`, `official_data_pending`, or `not_comparable` are still allowed to keep model fields blank.

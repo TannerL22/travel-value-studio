@@ -29,6 +29,18 @@ RESTCOUNTRIES_ALPHA = "https://restcountries.com/v3.1/alpha"
 EXCHANGE_RATES = "https://api.exchangerate.host/latest"
 FRANKFURTER_API = "https://api.frankfurter.dev/v1"
 
+TAIWAN_ISO3 = "TWN"
+TAIWAN_SUPPLEMENTAL = {
+    "iso3": TAIWAN_ISO3,
+    "country": "Taiwan",
+    "currency": "TWD",
+    # Taiwan Tourism Administration 2024 visitor consumption summary.
+    "intl_arrivals": 7_857_686,
+    "arrivals_year": 2024,
+    "fx_lcu_per_usd": 32.108,
+    "fx_year": 2024,
+}
+
 
 @dataclass
 class SeriesVintage:
@@ -95,6 +107,67 @@ def _minmax(s: pd.Series, q=(0.01, 0.99)) -> pd.Series:
 
 def _component_score(s: pd.Series) -> pd.Series:
     return (100.0 * s.clip(0, 1)).round(2)
+
+
+def _ensure_taiwan_supplemental_row(df: pd.DataFrame) -> pd.DataFrame:
+    """Add Taiwan when WDI omits it, keeping supplemental values sparse and explicit."""
+    out = df.copy()
+    if TAIWAN_ISO3 not in set(out["iso3"].astype(str)):
+        out = pd.concat(
+            [out, pd.DataFrame([{column: np.nan for column in out.columns}])],
+            ignore_index=True,
+        )
+        out.loc[out.index[-1], "iso3"] = TAIWAN_ISO3
+
+    mask = out["iso3"].astype(str).str.upper() == TAIWAN_ISO3
+    for column, value in TAIWAN_SUPPLEMENTAL.items():
+        if column in out.columns:
+            out.loc[mask & out[column].isna(), column] = value
+
+    out.loc[mask, "country"] = out.loc[mask, "country"].fillna("Taiwan")
+    out.loc[mask, "supplemental_model_row"] = True
+    return out
+
+
+def _apply_taiwan_supplemental_fields(df: pd.DataFrame, target_year: int) -> pd.DataFrame:
+    out = df.copy()
+    mask = out["iso3"].astype(str).str.upper() == TAIWAN_ISO3
+    if not mask.any():
+        return out
+
+    out["currency"] = out["currency"].astype("object")
+    out["fx_source"] = out["fx_source"].astype("object")
+    out.loc[mask, "currency"] = out.loc[mask, "currency"].fillna(
+        TAIWAN_SUPPLEMENTAL["currency"]
+    )
+    out.loc[mask, "fx_lcu_per_usd"] = out.loc[mask, "fx_lcu_per_usd"].fillna(
+        TAIWAN_SUPPLEMENTAL["fx_lcu_per_usd"]
+    )
+    out.loc[mask, "fx_year"] = out.loc[mask, "fx_year"].fillna(TAIWAN_SUPPLEMENTAL["fx_year"])
+    out.loc[mask, "intl_arrivals"] = out.loc[mask, "intl_arrivals"].fillna(
+        TAIWAN_SUPPLEMENTAL["intl_arrivals"]
+    )
+    out.loc[mask, "arrivals_year"] = out.loc[mask, "arrivals_year"].fillna(
+        TAIWAN_SUPPLEMENTAL["arrivals_year"]
+    )
+    out.loc[mask & out["fx_lcu_per_usd_live"].isna(), "fx_source"] = "TTA_2024_AVG"
+
+    ratio = np.where(
+        out["gdp_nom_pc_usd"].notna()
+        & (out["gdp_nom_pc_usd"] > 0)
+        & out["gdp_ppp_pc_int"].notna()
+        & (out["gdp_ppp_pc_int"] > 0),
+        out["gdp_ppp_pc_int"].astype(float) / out["gdp_nom_pc_usd"].astype(float),
+        np.nan,
+    )
+    needs_ppp_proxy = mask & out["ppp_private_lcu_per_int"].isna()
+    out.loc[needs_ppp_proxy, "ppp_private_lcu_per_int"] = (
+        out.loc[needs_ppp_proxy, "fx_lcu_per_usd"].astype(float)
+        / pd.Series(ratio, index=out.index).loc[needs_ppp_proxy].astype(float)
+    )
+    out.loc[needs_ppp_proxy, "ppp_private_year"] = target_year
+    out.loc[needs_ppp_proxy, "ppp_private_is_gdp_proxy"] = True
+    return out
 
 
 def _fx_tailwind_signal_from_ratio(s: pd.Series) -> pd.Series:
@@ -501,6 +574,7 @@ def build_dataset(
         if "country_x" in df.columns:
             df["country"] = df["country"].fillna(df["country_x"])
             df = df.drop(columns=["country_x"])
+    df = _ensure_taiwan_supplemental_row(df)
 
     imf_inf_rows = []
     if use_imf_for_gdp:
@@ -556,6 +630,9 @@ def build_dataset(
     df["fx_frankfurter_3y_date"] = np.nan
     df["fx_reference_dates_available"] = False
     df["fx_enrichment_warnings"] = ""
+    df["ppp_private_is_gdp_proxy"] = False
+    df["supplemental_model_row"] = df.get("supplemental_model_row", False).fillna(False)
+    df = _apply_taiwan_supplemental_fields(df, target_year)
 
     if use_live_fx:
         fx_warnings: List[str] = []
@@ -647,6 +724,8 @@ def build_dataset(
             f"Reference dates: {fx_history.get('one_year_date')}, {fx_history.get('three_year_date')}"
         )
 
+    df = _apply_taiwan_supplemental_fields(df, target_year)
+
     df["tourism_pp_power"] = np.where(
         df["fx_lcu_per_usd"].notna() & df["ppp_private_lcu_per_int"].notna() & (df["ppp_private_lcu_per_int"] != 0),
         df["fx_lcu_per_usd"].astype(float) / df["ppp_private_lcu_per_int"].astype(float),
@@ -736,7 +815,10 @@ def compute_scores(
     d["score_infra"] = (eps + infra_component).pow(tourism_infra_weight)
     d["component_tourism_depth"] = _component_score(infra_component)
 
-    wgi_scaled = ((d["wgi_political_stability"] + 2.5) / 5.0).clip(0, 1)
+    wgi_scaled_raw = ((d["wgi_political_stability"] + 2.5) / 5.0).clip(0, 1)
+    # Missing WGI should reduce confidence, not silently remove otherwise usable rows.
+    # Data-quality flags still expose missing_stability to the frontend/methodology layer.
+    wgi_scaled = wgi_scaled_raw.fillna(0.5)
     if "safety" in d.columns and d["safety"].notna().any():
         saf_scaled = _minmax(d["safety"])
         safety_component = (0.6 * wgi_scaled.fillna(0) + 0.4 * saf_scaled.fillna(0)).clip(0, 1)
@@ -748,7 +830,7 @@ def compute_scores(
     d["component_comfort_floor"] = _component_score(d["score_floor_penalty"])
 
     if min_stability is not None:
-        d = d[wgi_scaled >= float(min_stability)].copy()
+        d = d[wgi_scaled_raw >= float(min_stability)].copy()
 
     d["score"] = d["score_base"] * d["score_floor_penalty"] * d["score_tourism_cost"] * d["score_infra"] * d["score_safety"]
     d = d.dropna(subset=["score"]).sort_values("score", ascending=False).reset_index(drop=True)

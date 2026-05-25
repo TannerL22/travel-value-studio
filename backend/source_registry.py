@@ -72,6 +72,18 @@ SOURCE_REGISTRY: Dict[str, SourceField] = {
         "Nowcasts assume inflation differentials approximate PPP changes.",
         "low",
     ),
+    "ppp_private_is_gdp_proxy": SourceField(
+        "ppp_private_is_gdp_proxy",
+        "GDP PPP proxy flag",
+        "Derived from IMF GDP PPP ratio when private-consumption PPP is unavailable",
+        "fx_lcu_per_usd / (gdp_ppp_pc_int / gdp_nom_pc_usd)",
+        "Per dataset build",
+        "Country",
+        "derived/fallback",
+        "Whether private-consumption PPP was proxied from broad GDP PPP data.",
+        "GDP PPP is less tourist-facing than private-consumption PPP and should carry lower confidence.",
+        "low",
+    ),
     "fx_lcu_per_usd": SourceField(
         "fx_lcu_per_usd",
         "FX rate, local currency per USD",
@@ -420,6 +432,18 @@ SOURCE_REGISTRY: Dict[str, SourceField] = {
         "Source availability varies by currency and API health.",
         "high",
     ),
+    "supplemental_model_row": SourceField(
+        "supplemental_model_row",
+        "Supplemental model row",
+        "Manual official-source supplement",
+        None,
+        "Per dataset build",
+        "Country",
+        "fallback",
+        "Whether a row was added because the default WDI country universe omits it.",
+        "Supplemental rows can mix sources and should be reviewed before strong conclusions.",
+        "low",
+    ),
     "fx_live_date": SourceField(
         "fx_live_date",
         "Live FX date",
@@ -636,6 +660,10 @@ def compute_row_data_quality(row: Mapping[str, Any]) -> Dict[str, Any]:
         flags.append("fx_fallback_wdi")
     if bool(row.get("ppp_private_is_nowcast", False)):
         flags.append("ppp_nowcast")
+    if bool(row.get("ppp_private_is_gdp_proxy", False)):
+        flags.append("ppp_private_gdp_proxy")
+    if bool(row.get("supplemental_model_row", False)):
+        flags.append("supplemental_model_row")
     if _is_missing(row.get("intl_arrivals")):
         flags.append("missing_arrivals")
     if _is_missing(row.get("wgi_political_stability")):
@@ -681,6 +709,8 @@ def compute_row_data_quality(row: Mapping[str, Any]) -> Dict[str, Any]:
         "missing_fx": 25,
         "fx_fallback_wdi": 8,
         "ppp_nowcast": 8,
+        "ppp_private_gdp_proxy": 12,
+        "supplemental_model_row": 8,
         "missing_arrivals": 10,
         "missing_stability": 15,
         "missing_currency": 8,
