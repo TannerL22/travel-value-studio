@@ -273,6 +273,55 @@ JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE_REQUIRED_COLUMNS: List[str] = [
     "notes",
 ]
 
+JAPAN_TAIWAN_MODEL_DRIVER_DIAGNOSTICS_REQUIRED_COLUMNS: List[str] = [
+    "origin_iso3",
+    "origin_currency",
+    "destination_iso3",
+    "destination_country",
+    "model_rank",
+    "model_score",
+    "model_est_daily_cost_origin_currency",
+    "model_value_multiplier_relative",
+    "official_spend_per_day_usd",
+    "official_spend_per_day_gbp",
+    "official_vs_model_direction",
+    "score_base",
+    "score_floor_penalty",
+    "score_tourism_cost",
+    "score_infra",
+    "score_safety",
+    "component_fx_tailwind",
+    "component_fx_tailwind_source",
+    "component_ppp_advantage",
+    "component_comfort_floor",
+    "component_tourism_depth",
+    "component_safety_stability",
+    "tourism_pp_power",
+    "gdp_nom_pc_usd",
+    "gdp_ppp_pc_int",
+    "ppp_private_lcu_per_int",
+    "ppp_private_is_gdp_proxy",
+    "fx_lcu_per_usd",
+    "fx_source",
+    "intl_arrivals",
+    "wgi_political_stability",
+    "supplemental_model_row",
+    "data_quality_score",
+    "data_quality_grade",
+    "data_quality_flags",
+    "diagnosis_notes",
+]
+
+JAPAN_TAIWAN_MODEL_DRIVER_DELTA_REQUIRED_COLUMNS: List[str] = [
+    "metric",
+    "japan_value",
+    "taiwan_value",
+    "taiwan_minus_japan",
+    "direction",
+    "interpretation",
+    "confidence",
+]
+
 MODEL_VALIDATION_REQUIRED_MODEL_COLUMNS: List[str] = [
     "model_score",
     "model_est_daily_cost_origin_currency",
@@ -686,4 +735,63 @@ def validate_japan_taiwan_model_validation_template(
                     "Japan/Taiwan model validation template has populated "
                     f"validation_signal rows missing {column} (CSV rows: {rows})"
                 )
+    return df
+
+
+def validate_japan_taiwan_model_driver_diagnostics(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        JAPAN_TAIWAN_MODEL_DRIVER_DIAGNOSTICS_REQUIRED_COLUMNS,
+        "Japan/Taiwan model driver diagnostics",
+    )
+    _validate_non_negative_numeric(
+        df,
+        [
+            "model_rank",
+            "model_score",
+            "model_est_daily_cost_origin_currency",
+            "model_value_multiplier_relative",
+            "official_spend_per_day_usd",
+            "official_spend_per_day_gbp",
+            "score_base",
+            "score_floor_penalty",
+            "score_tourism_cost",
+            "score_infra",
+            "score_safety",
+            "component_fx_tailwind",
+            "component_ppp_advantage",
+            "component_comfort_floor",
+            "component_tourism_depth",
+            "component_safety_stability",
+            "tourism_pp_power",
+            "gdp_nom_pc_usd",
+            "gdp_ppp_pc_int",
+            "ppp_private_lcu_per_int",
+            "fx_lcu_per_usd",
+            "intl_arrivals",
+            "data_quality_score",
+        ],
+        "Japan/Taiwan model driver diagnostics",
+    )
+    _validate_numeric(
+        df,
+        ["wgi_political_stability"],
+        "Japan/Taiwan model driver diagnostics",
+    )
+    return df
+
+
+def validate_japan_taiwan_model_driver_delta(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        JAPAN_TAIWAN_MODEL_DRIVER_DELTA_REQUIRED_COLUMNS,
+        "Japan/Taiwan model driver delta",
+    )
+    _validate_numeric(
+        df,
+        ["japan_value", "taiwan_value", "taiwan_minus_japan"],
+        "Japan/Taiwan model driver delta",
+    )
     return df

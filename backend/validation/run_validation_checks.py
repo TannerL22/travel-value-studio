@@ -9,6 +9,8 @@ from validation_schema import (
     validate_japan_official_visitor_spend,
     validate_japan_official_visitor_spend_per_day,
     validate_japan_official_visitor_spend_summary,
+    validate_japan_taiwan_model_driver_delta,
+    validate_japan_taiwan_model_driver_diagnostics,
     validate_japan_taiwan_model_validation_template,
     validate_japan_taiwan_official_comparison_fx_normalized,
     validate_japan_taiwan_official_comparison_summary,
@@ -53,6 +55,12 @@ JAPAN_TAIWAN_OFFICIAL_COMPARISON_FX_NORMALIZED = (
 )
 JAPAN_TAIWAN_MODEL_VALIDATION_TEMPLATE = (
     VALIDATION_DIR / "japan_taiwan_model_validation_template.csv"
+)
+JAPAN_TAIWAN_MODEL_DRIVER_DIAGNOSTICS = (
+    VALIDATION_DIR / "japan_taiwan_model_driver_diagnostics.csv"
+)
+JAPAN_TAIWAN_MODEL_DRIVER_DELTA = (
+    VALIDATION_DIR / "japan_taiwan_model_driver_delta.csv"
 )
 
 
@@ -167,6 +175,22 @@ def main() -> None:
     else:
         model_template_message = ", model validation template not yet populated"
 
+    if JAPAN_TAIWAN_MODEL_DRIVER_DIAGNOSTICS.exists():
+        model_drivers = validate_japan_taiwan_model_driver_diagnostics(
+            JAPAN_TAIWAN_MODEL_DRIVER_DIAGNOSTICS
+        )
+        model_drivers_message = f", {len(model_drivers)} model driver diagnostic rows"
+    else:
+        model_drivers_message = ", model driver diagnostics not yet populated"
+
+    if JAPAN_TAIWAN_MODEL_DRIVER_DELTA.exists():
+        model_delta = validate_japan_taiwan_model_driver_delta(
+            JAPAN_TAIWAN_MODEL_DRIVER_DELTA
+        )
+        model_delta_message = f", {len(model_delta)} model driver delta rows"
+    else:
+        model_delta_message = ", model driver delta not yet populated"
+
     print(
         "Japan/Taiwan validation scaffold checks passed "
         f"({len(basket)} basket rows, {len(sources)} source rows"
@@ -174,7 +198,7 @@ def main() -> None:
         f"{taiwan_spend_message}{taiwan_length_message}{taiwan_per_day_message}"
         f"{taiwan_summary_message}{comparison_summary_message}"
         f"{comparison_usd_message}{fx_rates_message}{fx_normalized_message}"
-        f"{model_template_message})."
+        f"{model_template_message}{model_drivers_message}{model_delta_message})."
     )
 
 

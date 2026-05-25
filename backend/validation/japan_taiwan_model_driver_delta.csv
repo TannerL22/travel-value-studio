@@ -1,0 +1,18 @@
+metric,japan_value,taiwan_value,taiwan_minus_japan,direction,interpretation,confidence
+model_est_daily_cost_origin_currency,139.7764,94.9412,-44.8353,Taiwan lower model estimated daily cost,favours_taiwan,medium
+official_spend_per_day_gbp,121.79,143.05,21.26,Taiwan higher official spend/day,favours_japan,medium
+model_value_multiplier_relative,1.4766,2.1202,0.6436,Taiwan higher relative value multiplier,favours_taiwan,low
+score_base,0.0000000138,0.0000000284,0.0000000146,Taiwan higher raw multiplicative base score,favours_taiwan,low
+score_tourism_cost,0.3266,0.4956,0.1690,Taiwan higher tourism-cost score input,favours_taiwan,low
+score_infra,0.5835,0.6322,0.0487,Taiwan slightly higher tourism-depth score input,favours_taiwan,medium
+score_safety,0.4747,0.4747,0.0000,Neutral because both WGI values are missing and neutral-filled,mixed,low
+component_fx_tailwind,94.44,33.17,-61.27,Japan much stronger FX Tailwind component,favours_japan,medium
+component_ppp_advantage,30.41,47.39,16.98,Taiwan higher PPP Advantage component,favours_taiwan,low
+component_tourism_depth,54.22,59.39,5.17,Taiwan modestly higher Tourism Depth component,favours_taiwan,medium
+component_safety_stability,50.0,50.0,0.0,Neutral because both WGI values are missing and neutral-filled,mixed,low
+tourism_pp_power,1.5914,2.2850,0.6937,Taiwan higher tourism purchasing-power proxy,favours_taiwan,low
+gdp_nom_pc_usd,35973.152,39488.575,3515.423,Taiwan higher nominal GDP per capita,mixed,medium
+gdp_ppp_pc_int,56853.535,90233.262,33379.727,Taiwan higher PPP GDP per capita,favours_taiwan,medium
+ppp_private_lcu_per_int,99.8687,14.0514,-85.8173,Different local currencies; Taiwan value is GDP PPP proxy,not_comparable,low
+intl_arrivals,4115799.8047,7857686.0,3741886.1953,Taiwan higher current model arrivals input,favours_taiwan,medium
+data_quality_score,77,55,-22,Taiwan lower data quality score,favours_japan,high
