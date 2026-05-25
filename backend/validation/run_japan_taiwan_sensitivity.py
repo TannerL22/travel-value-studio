@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
@@ -23,6 +24,10 @@ from data_sources import (  # noqa: E402
 
 VALIDATION_DIR = Path(__file__).resolve().parent
 SCENARIOS_PATH = VALIDATION_DIR / "japan_taiwan_sensitivity_scenarios.csv"
+SNAPSHOT_PATH = VALIDATION_DIR / "japan_taiwan_model_snapshot.csv"
+MODEL_VALIDATION_TEMPLATE_PATH = (
+    VALIDATION_DIR / "japan_taiwan_model_validation_template.csv"
+)
 FX_NORMALIZED_PATH = (
     VALIDATION_DIR / "japan_taiwan_official_comparison_fx_normalized.csv"
 )
@@ -71,6 +76,10 @@ def get_official_spend_day_gbp(path: Path = FX_NORMALIZED_PATH) -> Dict[str, flo
     }
 
 
+def load_model_snapshot(path: Path = SNAPSHOT_PATH) -> pd.DataFrame:
+    return pd.read_csv(path, keep_default_na=False)
+
+
 def apply_diagnostic_adjustments(row: pd.Series, scenario: pd.Series) -> Dict[str, Any]:
     ppp_weight = _as_float(scenario.get("ppp_advantage_adjustment"), 1.0)
     fx_weight = _as_float(scenario.get("fx_component_adjustment"), 0.0)
@@ -94,6 +103,8 @@ def apply_diagnostic_adjustments(row: pd.Series, scenario: pd.Series) -> Dict[st
         _as_bool(row.get("supplemental_model_row"))
         or _as_bool(row.get("ppp_private_is_gdp_proxy"))
         or str(row.get("component_fx_tailwind_source", "")).strip() == "model_proxy"
+        or "supplemental_model_row" in str(row.get("data_quality_flags", ""))
+        or "ppp_private_gdp_proxy" in str(row.get("data_quality_flags", ""))
     )
     if scenario.get("scenario_id") == "conservative_taiwan_proxy_penalty" and is_proxy_row:
         proxy_factor = 0.75
@@ -101,9 +112,11 @@ def apply_diagnostic_adjustments(row: pd.Series, scenario: pd.Series) -> Dict[st
         proxy_flags.append("supplemental/proxy penalty")
 
     total_score_factor = ppp_factor * tourism_factor * fx_factor * proxy_factor
-    adjusted_score = _as_float(row.get("Score")) * total_score_factor
+    adjusted_score = _as_float(row.get("Score", row.get("model_score"))) * total_score_factor
     adjusted_cost = (
-        _as_float(row.get("est_daily_cost"))
+        _as_float(
+            row.get("est_daily_cost", row.get("model_est_daily_cost_origin_currency"))
+        )
         / max(ppp_factor * tourism_factor * fx_factor, 0.05)
         * proxy_cost_factor
     )
@@ -123,7 +136,67 @@ def apply_diagnostic_adjustments(row: pd.Series, scenario: pd.Series) -> Dict[st
     }
 
 
-def run_scenario(df_raw: pd.DataFrame, scenario: pd.Series) -> pd.DataFrame:
+def row_to_result(
+    row: pd.Series,
+    scenario: pd.Series,
+    source_mode: str,
+) -> Dict[str, Any]:
+    adjustments = apply_diagnostic_adjustments(row, scenario)
+    return {
+        "scenario_id": scenario["scenario_id"],
+        "scenario_label": scenario["scenario_label"],
+        "origin_iso3": row.get("origin_iso3", ORIGIN_ISO3),
+        "origin_currency": row.get("origin_currency", ""),
+        "destination_iso3": row["destination_iso3"]
+        if "destination_iso3" in row
+        else row["iso3"],
+        "destination_country": row["destination_country"]
+        if "destination_country" in row
+        else row["country"],
+        "model_rank": int(_as_float(row.get("model_rank", row.get("rank")))),
+        "model_score": _round(row.get("model_score", row.get("Score")), 4),
+        "model_est_daily_cost_origin_currency": _round(
+            row.get("model_est_daily_cost_origin_currency", row.get("est_daily_cost")),
+            4,
+        ),
+        "model_value_multiplier_relative": _round(
+            row.get("model_value_multiplier_relative", row.get("value_multiplier_relative")),
+            4,
+        ),
+        "component_fx_tailwind": _round(row["component_fx_tailwind"], 4),
+        "component_fx_tailwind_source": row["component_fx_tailwind_source"],
+        "component_ppp_advantage": _round(row["component_ppp_advantage"], 4),
+        "component_comfort_floor": _round(row["component_comfort_floor"], 4),
+        "component_tourism_depth": _round(row["component_tourism_depth"], 4),
+        "component_safety_stability": _round(row["component_safety_stability"], 4),
+        "tourism_pp_power": _round(row["tourism_pp_power"], 4),
+        "score_tourism_cost": _round(row["score_tourism_cost"], 4),
+        "score_infra": _round(row["score_infra"], 4),
+        "score_safety": _round(row["score_safety"], 4),
+        "data_quality_score": _round(row.get("data_quality_score"), 4),
+        "data_quality_grade": row.get("data_quality_grade", ""),
+        "data_quality_flags": row.get("data_quality_flags", ""),
+        "diagnostic_adjusted_score": _round(
+            adjustments["diagnostic_adjusted_score"], 4
+        ),
+        "diagnostic_adjusted_est_daily_cost": _round(
+            adjustments["diagnostic_adjusted_est_daily_cost"], 4
+        ),
+        "diagnostic_adjustment_notes": adjustments["diagnostic_adjustment_notes"],
+        "notes": f"{scenario.get('notes', '')} Source mode: {source_mode}.",
+    }
+
+
+def run_snapshot_scenario(snapshot: pd.DataFrame, scenario: pd.Series) -> pd.DataFrame:
+    rows = [
+        row_to_result(row, scenario, source_mode="snapshot")
+        for _, row in snapshot.iterrows()
+        if row["destination_iso3"] in TARGET_ISO3
+    ]
+    return pd.DataFrame(rows)
+
+
+def run_live_scenario(df_raw: pd.DataFrame, scenario: pd.Series) -> pd.DataFrame:
     origin_context = resolve_origin_context(df_raw, ORIGIN_ISO3)
     budget_sens = _as_float(scenario["budget_sens"])
     comfort = _as_float(scenario["comfort"])
@@ -171,52 +244,19 @@ def run_scenario(df_raw: pd.DataFrame, scenario: pd.Series) -> pd.DataFrame:
     scored["rank"] = np.arange(1, len(scored) + 1)
     scored["Score"] = scored["component_overall_value"]
 
-    official_gbp = get_official_spend_day_gbp()
     rows: List[Dict[str, Any]] = []
     for iso3 in TARGET_ISO3:
         row = scored[scored["iso3"] == iso3].iloc[0]
-        adjustments = apply_diagnostic_adjustments(row, scenario)
-        rows.append(
-            {
-                "scenario_id": scenario["scenario_id"],
-                "scenario_label": scenario["scenario_label"],
-                "origin_iso3": origin_context["origin_used"],
-                "origin_currency": origin_currency,
-                "destination_iso3": row["iso3"],
-                "destination_country": row["country"],
-                "model_rank": int(row["rank"]),
-                "model_score": _round(row["Score"], 4),
-                "model_est_daily_cost_origin_currency": _round(row["est_daily_cost"], 4),
-                "model_value_multiplier_relative": _round(
-                    row["value_multiplier_relative"], 4
-                ),
-                "component_fx_tailwind": _round(row["component_fx_tailwind"], 4),
-                "component_fx_tailwind_source": row["component_fx_tailwind_source"],
-                "component_ppp_advantage": _round(row["component_ppp_advantage"], 4),
-                "component_comfort_floor": _round(row["component_comfort_floor"], 4),
-                "component_tourism_depth": _round(row["component_tourism_depth"], 4),
-                "component_safety_stability": _round(
-                    row["component_safety_stability"], 4
-                ),
-                "tourism_pp_power": _round(row["tourism_pp_power"], 4),
-                "score_tourism_cost": _round(row["score_tourism_cost"], 4),
-                "score_infra": _round(row["score_infra"], 4),
-                "score_safety": _round(row["score_safety"], 4),
-                "data_quality_score": _round(row.get("data_quality_score"), 4),
-                "data_quality_grade": row.get("data_quality_grade", ""),
-                "data_quality_flags": row.get("data_quality_flags", ""),
-                "diagnostic_adjusted_score": _round(
-                    adjustments["diagnostic_adjusted_score"], 4
-                ),
-                "diagnostic_adjusted_est_daily_cost": _round(
-                    adjustments["diagnostic_adjusted_est_daily_cost"], 4
-                ),
-                "diagnostic_adjustment_notes": adjustments[
-                    "diagnostic_adjustment_notes"
-                ],
-                "notes": scenario.get("notes", ""),
-            }
-        )
+        row = row.copy()
+        row["origin_iso3"] = origin_context["origin_used"]
+        row["origin_currency"] = origin_currency
+        row["destination_iso3"] = row["iso3"]
+        row["destination_country"] = row["country"]
+        row["model_rank"] = row["rank"]
+        row["model_score"] = row["Score"]
+        row["model_est_daily_cost_origin_currency"] = row["est_daily_cost"]
+        row["model_value_multiplier_relative"] = row["value_multiplier_relative"]
+        rows.append(row_to_result(row, scenario, source_mode="live_rebuild"))
     return pd.DataFrame(rows)
 
 
@@ -274,13 +314,57 @@ def summarize_results(results: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def run_sensitivity() -> tuple[pd.DataFrame, pd.DataFrame]:
+def assert_snapshot_reproducibility(results: pd.DataFrame) -> None:
+    baseline = results[results["scenario_id"] == "baseline_default"].copy()
+    snapshot = load_model_snapshot()
+    template = pd.read_csv(MODEL_VALIDATION_TEMPLATE_PATH, keep_default_na=False)
+
+    tolerance = 0.005
+    for iso3 in TARGET_ISO3:
+        result_row = baseline[baseline["destination_iso3"] == iso3].iloc[0]
+        snapshot_row = snapshot[snapshot["destination_iso3"] == iso3].iloc[0]
+        template_row = template[template["destination_iso3"] == iso3].iloc[0]
+
+        result_fx = float(result_row["component_fx_tailwind"])
+        snapshot_fx = float(snapshot_row["component_fx_tailwind"])
+        if abs(result_fx - snapshot_fx) > tolerance:
+            raise ValueError(
+                f"Baseline {iso3} FX component {result_fx} does not match "
+                f"snapshot {snapshot_fx}"
+            )
+        if (
+            str(result_row["component_fx_tailwind_source"])
+            != str(snapshot_row["component_fx_tailwind_source"])
+        ):
+            raise ValueError(f"Baseline {iso3} FX source does not match snapshot")
+
+        result_cost = float(result_row["model_est_daily_cost_origin_currency"])
+        template_cost = float(template_row["model_est_daily_cost_origin_currency"])
+        if abs(result_cost - template_cost) > tolerance:
+            raise ValueError(
+                f"Baseline {iso3} cost {result_cost} does not match "
+                f"model-validation template {template_cost}"
+            )
+
+
+def run_sensitivity(use_live_rebuild: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
     scenarios = load_scenarios()
-    df_raw, _ = build_dataset(target_year=DEFAULT_YEAR, use_live_fx=True)
-    results = pd.concat(
-        [run_scenario(df_raw, scenario) for _, scenario in scenarios.iterrows()],
-        ignore_index=True,
-    )
+    if use_live_rebuild:
+        df_raw, _ = build_dataset(target_year=DEFAULT_YEAR, use_live_fx=True)
+        results = pd.concat(
+            [run_live_scenario(df_raw, scenario) for _, scenario in scenarios.iterrows()],
+            ignore_index=True,
+        )
+    else:
+        snapshot = load_model_snapshot()
+        results = pd.concat(
+            [
+                run_snapshot_scenario(snapshot, scenario)
+                for _, scenario in scenarios.iterrows()
+            ],
+            ignore_index=True,
+        )
+        assert_snapshot_reproducibility(results)
     summary = summarize_results(results)
     results.to_csv(RESULTS_PATH, index=False)
     summary.to_csv(SUMMARY_PATH, index=False)
@@ -288,9 +372,11 @@ def run_sensitivity() -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def main() -> None:
-    results, summary = run_sensitivity()
+    use_live_rebuild = os.getenv("SENSITIVITY_USE_LIVE_REBUILD", "").strip() == "1"
+    results, summary = run_sensitivity(use_live_rebuild=use_live_rebuild)
+    mode = "live rebuild" if use_live_rebuild else "snapshot"
     print(
-        "Japan/Taiwan sensitivity complete "
+        f"Japan/Taiwan sensitivity complete ({mode} mode) "
         f"({len(results)} result rows, {len(summary)} summary rows)."
     )
 

@@ -147,11 +147,12 @@ This scaffold does not prove whether Japan or Taiwan is better value yet. It inc
 - `japan_taiwan_model_driver_diagnostics.csv`: model-driver row diagnostics explaining why the current backend prefers Taiwan for `GBR` / `GBP`.
 - `japan_taiwan_model_driver_delta.csv`: Japan-versus-Taiwan deltas for key score components, raw inputs, and data-quality fields.
 - `japan_taiwan_model_driver_diagnostics_notes.md`: diagnosis notes for interpreting the model-driver mismatch without changing scoring yet.
+- `japan_taiwan_model_snapshot.csv`: deterministic `GBR` / `GBP` Japan/Taiwan model baseline used by sensitivity tests.
 - `japan_taiwan_sensitivity_scenarios.csv`: controlled validation-only scenario definitions for Japan/Taiwan model sensitivity testing.
 - `japan_taiwan_sensitivity_results.csv`: row-level Japan/Taiwan outputs for each sensitivity scenario.
 - `japan_taiwan_sensitivity_summary.csv`: scenario summary showing whether the mismatch persists and which adjustments shrink it.
 - `japan_taiwan_sensitivity_notes.md`: cautious interpretation of the sensitivity results.
-- `run_japan_taiwan_sensitivity.py`: local validation runner that regenerates sensitivity outputs without changing production scoring.
+- `run_japan_taiwan_sensitivity.py`: local validation runner that regenerates sensitivity outputs without changing production scoring. It uses the model snapshot by default; live rebuilds require `SENSITIVITY_USE_LIVE_REBUILD=1` and may differ if live FX/API enrichment changes.
 - `taiwan_data_collection_notes.md`: official Taiwan pages inspected, parsing notes, and remaining Taiwan data gaps.
 - `japan_data_collection_notes.md`: official pages inspected, parsing notes, and remaining Japan data gaps.
 - `validation_schema.py` and `run_validation_checks.py`: lightweight pandas checks for required columns, observed-row source/price fields, and the Japan official spend file when present.
@@ -162,7 +163,7 @@ The first populated `GBR` model-validation run is recorded. Japan now remains in
 
 The model-driver diagnostics identify why this happens under the current architecture: Taiwan has higher `tourism_pp_power`, PPP Advantage, score_tourism_cost, and a modest Tourism Depth edge. Japan has a much stronger FX Tailwind, but FX Tailwind is currently exposed as a component/diagnostic rather than a direct multiplier in the ranking score. This is a diagnosis layer, not a scoring change, and the mismatch remains a warning signal pending item-basket validation.
 
-Controlled sensitivity testing has also been added. The tests diagnose model fragility only; production scoring is unchanged. The current mismatch persists across the tested scenarios, but it shrinks most when PPP / `tourism_pp_power` influence is reduced or when Taiwan proxy-data penalties are applied. This points the next scoring review toward PPP weighting and proxy-data treatment, while preserving the need for item-basket validation.
+Controlled sensitivity testing has also been added. The tests diagnose model fragility only; production scoring is unchanged. They now use a deterministic model snapshot by default so Japan's accepted origin-historical FX Tailwind baseline is not replaced by a live-run proxy when upstream FX enrichment differs. The current mismatch persists across the tested deterministic scenarios, but it shrinks most when PPP / `tourism_pp_power` influence is reduced or when Taiwan proxy-data penalties are applied. This points the next scoring review toward PPP weighting and proxy-data treatment, while preserving the need for item-basket validation.
 
 ## Notes
 

@@ -11,6 +11,7 @@ from validation_schema import (
     validate_japan_official_visitor_spend_summary,
     validate_japan_taiwan_model_driver_delta,
     validate_japan_taiwan_model_driver_diagnostics,
+    validate_japan_taiwan_model_snapshot,
     validate_japan_taiwan_model_validation_template,
     validate_japan_taiwan_official_comparison_fx_normalized,
     validate_japan_taiwan_official_comparison_summary,
@@ -65,6 +66,7 @@ JAPAN_TAIWAN_MODEL_DRIVER_DIAGNOSTICS = (
 JAPAN_TAIWAN_MODEL_DRIVER_DELTA = (
     VALIDATION_DIR / "japan_taiwan_model_driver_delta.csv"
 )
+JAPAN_TAIWAN_MODEL_SNAPSHOT = VALIDATION_DIR / "japan_taiwan_model_snapshot.csv"
 JAPAN_TAIWAN_SENSITIVITY_SCENARIOS = (
     VALIDATION_DIR / "japan_taiwan_sensitivity_scenarios.csv"
 )
@@ -203,6 +205,14 @@ def main() -> None:
     else:
         model_delta_message = ", model driver delta not yet populated"
 
+    if JAPAN_TAIWAN_MODEL_SNAPSHOT.exists():
+        model_snapshot = validate_japan_taiwan_model_snapshot(
+            JAPAN_TAIWAN_MODEL_SNAPSHOT
+        )
+        model_snapshot_message = f", {len(model_snapshot)} model snapshot rows"
+    else:
+        model_snapshot_message = ", model snapshot not yet populated"
+
     if JAPAN_TAIWAN_SENSITIVITY_SCENARIOS.exists():
         sensitivity_scenarios = validate_japan_taiwan_sensitivity_scenarios(
             JAPAN_TAIWAN_SENSITIVITY_SCENARIOS
@@ -241,6 +251,7 @@ def main() -> None:
         f"{taiwan_summary_message}{comparison_summary_message}"
         f"{comparison_usd_message}{fx_rates_message}{fx_normalized_message}"
         f"{model_template_message}{model_drivers_message}{model_delta_message}"
+        f"{model_snapshot_message}"
         f"{sensitivity_scenarios_message}{sensitivity_results_message}"
         f"{sensitivity_summary_message})."
     )

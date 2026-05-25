@@ -2,7 +2,26 @@
 
 This is diagnostic only. Production scoring is unchanged.
 
-The sensitivity runner tests whether the Japan/Taiwan warning signal is fragile under controlled scoring variations for `GBR` / `GBP`. It reruns the backend scoring path for each scenario, then applies optional diagnostic-only adjustments to scores and estimated costs. These adjustments are not written back into `compute_scores()` and should not be treated as a new ranking model.
+The sensitivity runner tests whether the Japan/Taiwan warning signal is fragile under controlled scoring variations for `GBR` / `GBP`. By default it uses `japan_taiwan_model_snapshot.csv`, a fixed copy of the accepted model-driver baseline, then applies optional diagnostic-only adjustments to scores and estimated costs. These adjustments are not written back into `compute_scores()` and should not be treated as a new ranking model.
+
+## Baseline Reproducibility
+
+Sensitivity tests now default to a fixed validation snapshot. This fixes a reproducibility gap where a fresh live rebuild could change Japan's FX Tailwind from `origin_historical_fx` to `model_proxy` if historical FX enrichment was unavailable during the run. That changed Japan's component FX Tailwind and data-quality flags, so the sensitivity baseline no longer matched the accepted model-validation baseline.
+
+Snapshot mode reproduces the accepted baseline:
+
+- Japan FX Tailwind `94.44`, source `origin_historical_fx`, data quality `77 / B`.
+- Taiwan FX Tailwind `33.17`, source `model_proxy`, data quality `55 / C`.
+- Japan model daily cost `139.7764 GBP`.
+- Taiwan model daily cost `94.9412 GBP`.
+
+Live rebuild mode still exists for exploratory refreshes only:
+
+```powershell
+$env:SENSITIVITY_USE_LIVE_REBUILD='1'; python backend\validation\run_japan_taiwan_sensitivity.py
+```
+
+Live rebuilds may produce different FX enrichment depending on API availability and should not overwrite the deterministic validation baseline unless intentionally refreshing the snapshot.
 
 ## What Was Tested
 
@@ -24,10 +43,10 @@ No scenario reverses the diagnostic score preference. The mismatch persists acro
 
 Several scenarios shrink the diagnostic adjusted-cost gap:
 
-- `lower_ppp_weight_proxy` shrinks the adjusted cost gap from Taiwan `44.8352 GBP` cheaper to only `5.9015 GBP` cheaper.
-- `conservative_taiwan_proxy_penalty` shrinks the adjusted cost gap to `19.8581 GBP`.
-- `lower_tourism_depth_importance` shrinks the adjusted cost gap to `27.4870 GBP`.
-- `higher_fx_importance` shrinks the adjusted cost gap to `36.2490 GBP`.
+- `conservative_taiwan_proxy_penalty` shrinks the adjusted cost gap from Taiwan `44.8352 GBP` cheaper to only `1.4125 GBP` cheaper.
+- `lower_ppp_weight_proxy` shrinks the adjusted cost gap to `5.9023 GBP`.
+- `higher_fx_importance` shrinks the adjusted cost gap to `13.7615 GBP`.
+- `lower_tourism_depth_importance` shrinks the adjusted cost gap to `27.4881 GBP`.
 
 This suggests the mismatch is most sensitive to PPP / `tourism_pp_power` treatment and Taiwan proxy-data treatment. FX Tailwind helps Japan in the sensitivity layer, but the tested FX boost alone does not reverse the model preference.
 

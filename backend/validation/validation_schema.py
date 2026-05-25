@@ -322,6 +322,35 @@ JAPAN_TAIWAN_MODEL_DRIVER_DELTA_REQUIRED_COLUMNS: List[str] = [
     "confidence",
 ]
 
+JAPAN_TAIWAN_MODEL_SNAPSHOT_REQUIRED_COLUMNS: List[str] = [
+    "origin_iso3",
+    "origin_currency",
+    "destination_iso3",
+    "destination_country",
+    "model_rank",
+    "model_score",
+    "model_est_daily_cost_origin_currency",
+    "model_value_multiplier_relative",
+    "component_fx_tailwind",
+    "component_fx_tailwind_source",
+    "component_ppp_advantage",
+    "component_comfort_floor",
+    "component_tourism_depth",
+    "component_safety_stability",
+    "tourism_pp_power",
+    "score_tourism_cost",
+    "score_infra",
+    "score_safety",
+    "fx_tailwind_origin_recent_ratio",
+    "fx_tailwind_origin_source",
+    "fx_reference_dates_available",
+    "data_quality_score",
+    "data_quality_grade",
+    "data_quality_flags",
+    "snapshot_source",
+    "notes",
+]
+
 JAPAN_TAIWAN_SENSITIVITY_SCENARIOS_REQUIRED_COLUMNS: List[str] = [
     "scenario_id",
     "scenario_label",
@@ -855,6 +884,37 @@ def validate_japan_taiwan_model_driver_delta(path: str | Path) -> pd.DataFrame:
         df,
         ["japan_value", "taiwan_value", "taiwan_minus_japan"],
         "Japan/Taiwan model driver delta",
+    )
+    return df
+
+
+def validate_japan_taiwan_model_snapshot(path: str | Path) -> pd.DataFrame:
+    df = _read_csv(path)
+    _validate_required_columns(
+        df,
+        JAPAN_TAIWAN_MODEL_SNAPSHOT_REQUIRED_COLUMNS,
+        "Japan/Taiwan model snapshot",
+    )
+    _validate_non_negative_numeric(
+        df,
+        [
+            "model_rank",
+            "model_score",
+            "model_est_daily_cost_origin_currency",
+            "model_value_multiplier_relative",
+            "component_fx_tailwind",
+            "component_ppp_advantage",
+            "component_comfort_floor",
+            "component_tourism_depth",
+            "component_safety_stability",
+            "tourism_pp_power",
+            "score_tourism_cost",
+            "score_infra",
+            "score_safety",
+            "fx_tailwind_origin_recent_ratio",
+            "data_quality_score",
+        ],
+        "Japan/Taiwan model snapshot",
     )
     return df
 

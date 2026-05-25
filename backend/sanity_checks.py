@@ -11,7 +11,11 @@ from data_sources import (
     resolve_origin_context,
 )
 from source_registry import compute_row_data_quality
-from validation.run_japan_taiwan_sensitivity import apply_diagnostic_adjustments
+from validation.run_japan_taiwan_sensitivity import (
+    apply_diagnostic_adjustments,
+    assert_snapshot_reproducibility,
+    load_model_snapshot,
+)
 
 
 def test_good_row_quality() -> None:
@@ -317,6 +321,28 @@ def test_sensitivity_fx_boost_increases_high_fx_score() -> None:
     assert boosted["diagnostic_adjusted_score"] > base["diagnostic_adjusted_score"]
 
 
+def test_sensitivity_snapshot_baseline_matches_results() -> None:
+    snapshot = load_model_snapshot()
+    results = pd.read_csv(
+        "backend/validation/japan_taiwan_sensitivity_results.csv",
+        keep_default_na=False,
+    )
+    assert_snapshot_reproducibility(results)
+
+    baseline = results[results["scenario_id"] == "baseline_default"]
+    for iso3 in ["JPN", "TWN"]:
+        baseline_row = baseline[baseline["destination_iso3"] == iso3].iloc[0]
+        snapshot_row = snapshot[snapshot["destination_iso3"] == iso3].iloc[0]
+        assert (
+            float(baseline_row["component_fx_tailwind"])
+            == float(snapshot_row["component_fx_tailwind"])
+        )
+        assert (
+            baseline_row["component_fx_tailwind_source"]
+            == snapshot_row["component_fx_tailwind_source"]
+        )
+
+
 def main() -> None:
     test_good_row_quality()
     test_missing_ppp_fx_quality()
@@ -331,6 +357,7 @@ def main() -> None:
     test_sensitivity_baseline_adjustment_is_neutral()
     test_sensitivity_proxy_penalty_reduces_proxy_score_advantage()
     test_sensitivity_fx_boost_increases_high_fx_score()
+    test_sensitivity_snapshot_baseline_matches_results()
     print("Backend sanity checks passed.")
 
 
