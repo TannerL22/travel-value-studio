@@ -1,7 +1,7 @@
 "use client";
 
+import { memo } from "react";
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
-import { motion, useReducedMotion } from "framer-motion";
 
 import {
   formatDriverEffect,
@@ -14,7 +14,7 @@ import type { RankingRow } from "@/lib/types";
 type DestinationResultProps = {
   country: RankingRow;
   index: number;
-  onClick?: () => void;
+  onSelect?: (country: RankingRow) => void;
   onHoverChange?: (country: RankingRow | null) => void;
   isActive?: boolean;
   compact?: boolean;
@@ -30,106 +30,95 @@ const formatMultiplier = (value: number | null | undefined) => {
   return `${value.toFixed(2)}×`;
 };
 
-export function DestinationResult({
+function DestinationResultComponent({
   country,
   index,
-  onClick,
+  onSelect,
   onHoverChange,
   isActive = false,
   compact = false,
 }: DestinationResultProps) {
-  const reduceMotion = useReducedMotion();
   const name = country.country ?? country.iso3 ?? "Unknown";
   const rank = country.rank ?? index + 1;
   const valueScore = country.quality_adjusted_value ?? country.Score ?? country.score ?? null;
   const purchasingPower = country.structural_purchasing_power ?? country.value_multiplier_relative ?? null;
   const drivers = primaryRankingDrivers(country);
+  const conditions = [
+    country.basic_comfort != null ? `Comfort ${Math.round(country.basic_comfort)}` : null,
+    country.service_depth != null ? `Services ${Math.round(country.service_depth)}` : null,
+    country.stability != null ? `Stability ${Math.round(country.stability)}` : null,
+  ].filter(Boolean);
 
   return (
-    <motion.button
+    <button
       type="button"
-      layout={!reduceMotion}
-      initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={reduceMotion ? undefined : { opacity: 0, y: 8 }}
-      transition={reduceMotion ? { duration: 0 } : { duration: 0.28, delay: Math.min(index, 8) * 0.025 }}
-      onClick={onClick}
+      onClick={() => onSelect?.(country)}
       onMouseEnter={() => onHoverChange?.(country)}
       onMouseLeave={() => onHoverChange?.(null)}
       onFocus={() => onHoverChange?.(country)}
       onBlur={() => onHoverChange?.(null)}
-      className={`group flex min-h-11 w-full flex-col rounded-2xl border p-5 text-left shadow-lg shadow-black/10 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
+      className={`group flex min-h-11 w-full flex-col rounded-xl border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${compact ? "p-4" : "p-5"} ${
         isActive
-          ? "border-cyan-300/50 bg-cyan-950/25 ring-1 ring-cyan-300/15"
-          : "border-white/10 bg-zinc-950/45 hover:border-white/20 hover:bg-zinc-900/60"
+          ? "border-cyan-300/35 bg-cyan-300/[0.045]"
+          : "border-white/[0.07] bg-white/[0.012] hover:border-white/15 hover:bg-white/[0.025]"
       }`}
       aria-label={`Open ${name}, value rank ${rank}`}
     >
       <div className="flex items-start justify-between gap-5">
         <div className="min-w-0">
-          <p className="text-[11px] font-medium tabular-nums text-zinc-400">#{rank}</p>
+          <p className="text-xs tabular-nums text-zinc-500">#{rank}{country.iso3 ? <span className="ml-2 text-zinc-600">{country.iso3}</span> : null}</p>
           <h2 className={`${compact ? "text-lg" : "text-xl"} mt-1 truncate font-semibold tracking-tight text-white`}>{name}</h2>
-          <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-400">{country.iso3 ?? ""}</p>
         </div>
 
         <div className="shrink-0 text-right">
           <p className={`${compact ? "text-2xl" : "text-3xl"} font-semibold tabular-nums tracking-tight text-white`}>{formatScore(valueScore)}</p>
-          <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-zinc-400">Value score</p>
+          <p className="mt-0.5 text-xs text-zinc-500">Value score</p>
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3 border-y border-white/10 py-4">
+      <div className={`grid grid-cols-2 gap-5 border-t border-white/[0.07] ${compact ? "mt-4 pt-3" : "mt-5 pt-4"}`}>
         <div>
           <p className="text-lg font-semibold tabular-nums text-zinc-100">{formatMultiplier(purchasingPower)}</p>
-          <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-zinc-400">Purchasing power</p>
+          <p className="mt-0.5 text-xs text-zinc-500">Purchasing power</p>
         </div>
         <div>
           <p className="text-lg font-semibold tabular-nums text-zinc-100">{formatFxRankingEffect(country)}</p>
-          <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-zinc-400">FX rank effect</p>
+          <p className="mt-0.5 text-xs text-zinc-500">FX effect</p>
         </div>
       </div>
 
-      {!compact ? (
-        <div className="mt-4 flex flex-wrap gap-2 text-xs text-zinc-300">
-          {country.basic_comfort != null ? (
-            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1.5">Comfort {Math.round(country.basic_comfort)}</span>
-          ) : null}
-          {country.service_depth != null ? (
-            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1.5">Services {Math.round(country.service_depth)}</span>
-          ) : null}
-          {country.stability != null ? (
-            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1.5">Stability {Math.round(country.stability)}</span>
-          ) : null}
-        </div>
+      {!compact && conditions.length > 0 ? (
+        <p className="mt-3 text-xs leading-5 text-zinc-500">{conditions.join(" · ")}</p>
       ) : null}
 
-      <div className="mt-5 flex-1">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400">Why it ranks</p>
-        <p className="mt-2 text-sm leading-5 text-zinc-300">{rankingExplanation(country)}</p>
+      <div className={compact ? "mt-4" : "mt-5"}>
+        <p className="text-sm leading-5 text-zinc-300">{rankingExplanation(country)}</p>
 
         {drivers.length > 0 ? (
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+          <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5">
             {drivers.map((driver) => (
-              <span key={driver.key} className="inline-flex items-center gap-1.5 text-xs text-zinc-300">
+              <span key={driver.key} className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
                 {driver.direction === "help" ? (
-                  <ArrowUpRight className="h-3.5 w-3.5 text-emerald-300" />
+                  <ArrowUpRight className="h-3.5 w-3.5 text-emerald-300" aria-hidden="true" />
                 ) : (
-                  <ArrowDownRight className="h-3.5 w-3.5 text-amber-200" />
+                  <ArrowDownRight className="h-3.5 w-3.5 text-amber-200" aria-hidden="true" />
                 )}
                 <span>{driver.label}</span>
-                <span className="font-medium tabular-nums text-zinc-100">{formatDriverEffect(driver.effectPct)}</span>
+                <span className="font-medium tabular-nums text-zinc-200">{formatDriverEffect(driver.effectPct)}</span>
               </span>
             ))}
           </div>
         ) : null}
       </div>
 
-      <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-4 text-xs text-zinc-400">
-        <span>{country.data_quality_grade ? `Data quality ${country.data_quality_grade}` : "View evidence"}</span>
-        <span className="inline-flex items-center gap-1.5 text-zinc-200 transition group-hover:text-white">
-          Explore <ArrowRight className="h-3.5 w-3.5" />
+      <div className="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-xs text-zinc-500">
+        <span>{country.data_quality_grade ? `Data quality ${country.data_quality_grade}` : "Evidence available"}</span>
+        <span className="inline-flex items-center gap-1.5 font-medium text-zinc-300 transition-colors group-hover:text-white">
+          Explore <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
         </span>
       </div>
-    </motion.button>
+    </button>
   );
 }
+
+export const DestinationResult = memo(DestinationResultComponent);
