@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Dict, Any, Tuple
+from typing import Dict, Any, Tuple
 import os
 import time
 from datetime import datetime, timezone
@@ -18,6 +18,7 @@ from data_sources import (
     promote_origin_fx_tailwind_component,
     resolve_origin_context,
 )
+from model_contract import phase_1_methodology
 from source_registry import get_methodology_summary, get_source_registry
 
 
@@ -110,7 +111,7 @@ def get_api_source_registry() -> Any:
 
 @app.get("/api/methodology")
 def get_api_methodology() -> Any:
-    return get_methodology_summary()
+    return phase_1_methodology(get_methodology_summary())
 
 
 @app.post("/api/rankings")
@@ -156,7 +157,7 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
         scored["structural_purchasing_power"] - 1.0
     ) * 100.0
 
-    # Phase 1 semantic aliases. The legacy component columns are retained so
+    # Phase 1 semantic aliases. Legacy component columns are retained so
     # historical validation snapshots and downstream analysis remain readable.
     scored["fx_opportunity"] = scored["component_fx_tailwind"]
     scored["basic_comfort"] = scored["component_comfort_floor"]
