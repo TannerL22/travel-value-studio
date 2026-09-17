@@ -6,11 +6,11 @@ The target use case is a stay of several weeks to several months. Airfare and tr
 
 The current product question is:
 
-> **Where does the foreign currency I hold buy the most usable quality of life, without mistaking weak basic living conditions for value, and where is the FX timing unusually attractive right now?**
+> **Where does the foreign currency I hold buy the most usable quality of life, with enough basic services and destination-service capacity to actually enjoy the purchasing-power advantage, and where is the FX timing unusually attractive right now?**
 
 ## Current model status
 
-The project is at **Phase 3** of the model roadmap.
+The project is at **Phase 4** of the model roadmap.
 
 ### Phase 1 — semantic/model-contract cleanup
 
@@ -27,7 +27,7 @@ See `docs/PHASE_1_MODEL_CONTRACT.md`.
 
 Completed.
 
-FX Opportunity is a production ranking input rather than a display-only diagnostic. For the selected origin currency, the backend compares the current destination/origin cross with approximately 1 week, 1 month, 3 months, 1 year and 3 years ago. Those bilateral moves are combined into a bounded timing signal; by default FX can adjust the structural score by up to approximately **±15%**.
+FX Opportunity is a production ranking input rather than a display-only diagnostic. For the selected origin currency, the backend compares the current destination/origin cross with approximately 1 week, 1 month, 3 months, 1 year and 3 years ago. The resulting timing overlay is bounded to approximately **±15%** by default.
 
 See `docs/PHASE_2_FX_OPPORTUNITY.md`.
 
@@ -35,43 +35,63 @@ See `docs/PHASE_2_FX_OPPORTUNITY.md`.
 
 Completed.
 
-The production comfort floor now uses direct basic-service evidence rather than GDP PPP as the main signal:
-
-- safely managed drinking water, with at-least-basic water as a down-weighted fallback;
-- safely managed sanitation, with at-least-basic sanitation as a down-weighted fallback;
-- electricity access;
-- internet use;
-- UHC service coverage.
-
-Each pillar saturates after a strong modern baseline so already-developed countries do not receive endless additional rewards. Missing direct inputs blend toward the old GDP-PPP comfort proxy rather than being interpreted as bad living conditions.
-
-The production ranking order is now structural value → Basic Comfort penalty → bounded FX Opportunity overlay.
+The production comfort floor uses direct evidence for drinking water, sanitation, electricity, internet and health-service coverage. Each pillar saturates after a strong modern baseline so already-developed countries do not receive endless additional rewards. Missing direct inputs blend toward a fixed legacy GDP-PPP proxy rather than being interpreted as bad living conditions.
 
 See `docs/PHASE_3_BASIC_COMFORT.md`.
+
+### Phase 4 — Service Depth
+
+Completed.
+
+International-arrivals volume is no longer the production Service Depth signal.
+
+The preferred country-level source is the **World Economic Forum Travel & Tourism Development Index 2024 — Tourist Services and Infrastructure pillar**, which incorporates supply-side evidence such as:
+
+- hotel-room density;
+- short-term-rental listing density;
+- hotel/restaurant labour productivity;
+- travel-and-tourism capital investment intensity.
+
+For countries outside TTDI coverage, arrivals per resident survive only as a capped, low-confidence fallback. Missing service evidence is neutral rather than being treated as poor service supply.
+
+The Service Depth slider now controls only the **shortfall penalty**. The underlying destination score does not change when the user moves the slider.
+
+See `docs/PHASE_4_SERVICE_DEPTH.md`.
 
 ## Core concepts
 
 - **Structural Purchasing Power** — broad destination purchasing power relative to the selected origin using market FX and private-consumption PPP. This is an index, not a personal budget forecast.
 - **FX Opportunity** — bilateral origin-currency timing signal using 1W / 1M / 3M / 1Y / 3Y reference moves.
-- **Basic Comfort** — production Phase 3 service-floor composite using water, sanitation, electricity, internet and health evidence, with GDP PPP only as a missing-data fallback.
-- **Service Depth** — currently mainly an international-arrivals proxy; Phase 4 will replace this with measured amenity and service supply.
+- **Basic Comfort** — direct-service floor using water, sanitation, electricity, internet and health evidence, with GDP PPP only as a missing-data fallback.
+- **Service Depth** — production country-level service-supply measure using WEF TTDI Tourist Services and Infrastructure where available, with a reduced-confidence arrivals-per-capita fallback.
 - **Stability** — currently WGI-led political stability, not a complete personal-safety or crime measure.
-- **Quality-Adjusted Value** — structural score after the Basic Comfort penalty and bounded FX timing overlay, normalized to 0–100.
+- **Quality-Adjusted Value** — structural score after comfort and service-depth shortfall penalties plus bounded FX timing, normalized to 0–100.
+
+## Production ranking order
+
+1. structural purchasing-power / cheapness score;
+2. Phase 3 Basic Comfort shortfall penalty;
+3. Phase 4 Service Depth shortfall penalty;
+4. existing stability term;
+5. bounded Phase 2 FX Opportunity overlay;
+6. normalized Quality-Adjusted Value.
+
+The old GDP comfort penalty and arrivals-led infrastructure term are retained only for legacy/audit fields and are neutralized in production scoring.
 
 ## Roadmap
 
 1. **Phase 1 — semantic/model contract:** complete.
 2. **Phase 2 — FX v2:** complete.
 3. **Phase 3 — Basic Comfort:** complete.
-4. **Phase 4 — Service Depth:** amenity, accommodation, and tourism-service supply.
-5. **Phase 5 — City Intelligence:** city universe plus amenity density.
+4. **Phase 4 — Service Depth:** complete.
+5. **Phase 5 — City Intelligence:** city universe plus direct amenity density.
 6. **Phase 6 — Mobility / Digital Convenience:** public transport and digital-life layers.
 7. **Phase 7 — Ranking rebuild and validation.**
 
 ## Project layout
 
 ```text
-backend/   FastAPI API, data-source logic, scoring, FX Opportunity, Basic Comfort, validation
+backend/   FastAPI API, data-source logic, scoring, FX Opportunity, Basic Comfort, Service Depth, validation
 frontend/  Next.js dashboard UI
 docs/      model contracts and methodology notes
 ```
@@ -124,6 +144,7 @@ DATASET_CACHE_TTL_SECONDS=43200
 FX_OPPORTUNITY_CACHE_TTL_SECONDS=3600
 FX_OPPORTUNITY_MAX_EFFECT=0.15
 BASIC_COMFORT_CACHE_TTL_SECONDS=43200
+SERVICE_DEPTH_CACHE_TTL_SECONDS=86400
 ```
 
 `ALLOW_ORIGINS=*` allows all origins with credentials disabled.
@@ -132,14 +153,15 @@ BASIC_COMFORT_CACHE_TTL_SECONDS=43200
 
 Current production inputs include:
 
-- **World Bank WDI** — GDP, PPP, private-consumption PPP, CPI/inflation fallback, official FX fallback, international arrivals, WGI political stability, and the Phase 3 basic-service indicators.
+- **World Bank WDI** — GDP, PPP, private-consumption PPP, CPI/inflation fallback, official FX fallback, international arrivals, population, WGI political stability, and Phase 3 basic-service indicators.
 - **WHO/UNICEF JMP via WDI** — safely managed/basic drinking water and sanitation.
 - **World Bank / Tracking SDG7 via WDI** — electricity access.
 - **ITU via WDI** — individuals using the internet.
 - **WHO via WDI** — UHC service coverage index.
+- **World Economic Forum TTDI 2024** — Tourist Services and Infrastructure pillar, the Phase 4 preferred service-supply source.
 - **IMF DataMapper / WEO** — GDP and inflation where available.
 - **RestCountries** — ISO3-to-primary-currency mapping.
-- **Frankfurter** — current and historical FX. Phase 2 uses the v2 blended reference-rate feed for 1W / 1M / 3M / 1Y / 3Y bilateral FX Opportunity.
+- **Frankfurter** — current and historical FX, including Phase 2 1W / 1M / 3M / 1Y / 3Y bilateral FX Opportunity.
 - **Optional TTDI-style local template** — legacy/sample tourism infrastructure, safety, and price-competitiveness fields when explicitly supplied.
 
 The API exposes field-level provenance at:
@@ -147,40 +169,36 @@ The API exposes field-level provenance at:
 - `GET /api/source-registry`
 - `GET /api/methodology`
 
-## Phase 3 comfort audit fields
+## Phase 4 service-depth audit fields
 
 Ranking rows expose:
 
-- `basic_comfort`: production 0–100 comfort score.
-- `basic_comfort_direct`: direct-service composite before legacy fallback blending.
-- `basic_comfort_coverage`: reliability-weighted direct-data coverage.
-- `basic_comfort_source`: direct, blended direct/legacy, or legacy fallback.
-- `basic_comfort_flags`: row-level missing/fallback flags.
-- `basic_comfort_penalty`: preference-weighted ranking multiplier.
-- `legacy_basic_comfort`: retained old GDP-PPP component for auditability.
-- `comfort_water_score`, `comfort_sanitation_score`, `comfort_electricity_score`, `comfort_internet_score`, `comfort_health_score`.
-- the corresponding raw source fields and source years.
+- `service_depth`
+- `service_depth_direct`
+- `service_depth_coverage`
+- `service_depth_source`
+- `service_depth_reference_year`
+- `service_depth_penalty`
+- `service_depth_requirement_threshold`
+- `service_depth_ttdi_2024_value`
+- `service_depth_ttdi_2024_rank`
+- `service_depth_arrivals_per_100`
+- `service_depth_arrivals_fallback_score`
+- `service_depth_flags`
+- `legacy_service_depth`
+- `score_pre_service_depth`
+
+## Phase 3 comfort audit fields
+
+Ranking rows expose `basic_comfort`, direct-data coverage/source, pillar scores, flags, ranking penalty, and the fixed legacy GDP fallback used for missing-data blending.
 
 ## FX Opportunity audit fields
 
-Ranking rows expose:
-
-- `fx_opportunity`: 0–100 timing score.
-- `fx_opportunity_signal`: underlying -1 to +1 signal.
-- `fx_opportunity_multiplier`: bounded production ranking multiplier.
-- `fx_opportunity_coverage`: weighted share of configured horizons with usable data.
-- `fx_opportunity_source`: v2 bilateral history, legacy historical fallback, or unavailable.
-- `fx_opportunity_1w_pct`, `1m_pct`, `3m_pct`, `1y_pct`, `3y_pct`.
-- matching reference-date fields for each horizon.
-- `score_pre_fx_opportunity`: structural production score before the timing overlay.
-
-Legacy 1Y/3Y FX fields remain available for historical validation and fallback behavior.
+Ranking rows expose `fx_opportunity`, its -1 to +1 signal, bounded ranking multiplier, historical coverage/source, five horizon moves and dates, and `score_pre_fx_opportunity`.
 
 ## Validation
 
-`backend/validation/` contains the existing Japan/Taiwan evidence and sensitivity scaffold. It includes official visitor-spend evidence, model-driver diagnostics, deterministic snapshots, and sensitivity runs designed to test whether the model confuses weak currencies with genuinely useful purchasing power.
-
-Legacy snapshots are preserved rather than rewritten after scoring changes. New production rankings can therefore evolve while historical validation outputs remain reproducible.
+`backend/validation/` contains the existing Japan/Taiwan evidence and sensitivity scaffold. Legacy snapshots are preserved rather than rewritten after scoring changes so historical model behavior remains auditable.
 
 ## Checks
 
@@ -192,16 +210,17 @@ npm run build
 
 # Backend
 cd backend
-python -m py_compile main.py data_sources.py source_registry.py model_contract.py fx_opportunity.py phase2_registry.py basic_comfort.py phase3_registry.py
+python -m py_compile main.py data_sources.py source_registry.py model_contract.py fx_opportunity.py phase2_registry.py basic_comfort.py phase3_registry.py service_depth.py phase4_registry.py
 python sanity_checks.py
 python fx_opportunity_checks.py
 python basic_comfort_checks.py
+python service_depth_checks.py
 ```
 
 GitHub Actions runs the same backend and frontend checks on pushes to `main` and pull requests.
 
 ## Important interpretation limits
 
-Travel Value Studio is not currently a complete cost-of-living or temporary-resident budget model. Private-consumption PPP remains broad household-consumption data and furnished housing is not yet directly observed. Basic Comfort is materially more direct than the old GDP proxy but remains country-level; electricity access does not measure outage reliability, internet use does not measure speed/latency, and UHC does not guarantee traveller-specific healthcare access. Service Depth is still a temporary arrivals-led proxy, and reference FX rates are not executable card/cash quotes.
+Travel Value Studio is not yet a complete temporary-resident budget or city-quality model. Private-consumption PPP remains broad household-consumption data and furnished housing prices are not directly observed. Basic Comfort and Service Depth are materially better than the original GDP/arrivals proxies, but both remain country-level. TTDI service supply does not directly inventory the restaurants, supermarkets, gyms, pharmacies, coworking spaces, entertainment and neighborhood density that determine whether a three-month stay feels rich in practice.
 
-The intended use is **destination discovery and relative value screening**, with increasingly direct city-, service-, housing- and mobility-level inputs added in later phases.
+That is the purpose of **Phase 5: City Intelligence and Amenity Depth**.
