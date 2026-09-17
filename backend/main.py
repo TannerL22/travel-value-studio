@@ -24,8 +24,9 @@ from fx_opportunity import (
     add_fx_opportunity_v2,
     apply_fx_opportunity_to_ranking,
 )
-from model_contract import phase_3_methodology
-from phase3_registry import get_phase3_source_registry
+from model_contract import phase_4_methodology
+from phase4_registry import get_phase4_source_registry
+from service_depth import add_service_depth_v4, apply_service_depth_to_ranking
 from source_registry import get_methodology_summary
 
 
@@ -113,12 +114,12 @@ def get_origins() -> Any:
 
 @app.get("/api/source-registry")
 def get_api_source_registry() -> Any:
-    return get_phase3_source_registry()
+    return get_phase4_source_registry()
 
 
 @app.get("/api/methodology")
 def get_api_methodology() -> Any:
-    return phase_3_methodology(get_methodology_summary())
+    return phase_4_methodology(get_methodology_summary())
 
 
 @app.post("/api/rankings")
@@ -127,32 +128,37 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     origin_context = resolve_origin_context(df_raw, query.origin_iso3)
 
     alpha = 1.0 + 2.2 * query.budget_sens
-    ppp_floor = 3000 + 17000 * query.comfort
-    floor_strength = 1.0 + 2.0 * query.comfort
-    tourism_infra_weight = 0.1 + 1.2 * query.supply_need
-    arrivals_weight = 0.2 + 0.6 * query.supply_need
     safety_weight = 0.1 + 1.3 * query.risk_pri
-    # Phase 3 decouples comfort preference from cheapness weighting. Comfort now
-    # acts only through the dedicated Basic Comfort threshold/penalty layer.
     tourism_cost_weight = float(np.clip(0.2 + 1.0 * query.budget_sens, 0.0, 1.5))
 
+    # The legacy GDP comfort floor and arrivals-led infrastructure term are kept
+    # only to produce audit fields inside compute_scores. Their production effects
+    # are neutralized/replaced downstream by Phase 3 and Phase 4 respectively.
     scored = compute_scores(
         df_raw,
         nominal_penalty_exp=float(alpha),
-        ppp_quality_floor=float(ppp_floor),
-        floor_strength=float(floor_strength),
+        ppp_quality_floor=10_000.0,
+        floor_strength=2.0,
         tourism_cost_weight=float(tourism_cost_weight),
-        tourism_infra_weight=float(tourism_infra_weight),
+        tourism_infra_weight=0.0,
         safety_weight=float(safety_weight),
-        arrivals_weight=float(arrivals_weight),
+        arrivals_weight=1.0,
         min_stability=None,
     )
+
+    # Phase 3: objective basic-service score + preference-controlled shortfall penalty.
     scored = add_basic_comfort_v3(scored, target_year=query.year)
     scored = apply_basic_comfort_to_ranking(scored, comfort_requirement=query.comfort)
+
+    # Phase 4: supply-side Service Depth. WEF TTDI Tourist Services is preferred;
+    # arrivals per resident survive only as a capped, low-confidence fallback.
+    scored = add_service_depth_v4(scored, target_year=query.year)
+    scored = apply_service_depth_to_ranking(scored, service_requirement=query.supply_need)
 
     origin_pp = origin_context["origin_pp_multiplier"]
     origin_currency = origin_context["origin_currency"]
 
+    # Phase 2 FX timing remains the final bounded overlay after structural quality penalties.
     scored = add_origin_fx_tailwind_diagnostics(scored, origin_currency)
     scored = promote_origin_fx_tailwind_component(scored)
     scored = add_fx_opportunity_v2(scored, origin_currency)
@@ -164,7 +170,6 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
         scored["structural_purchasing_power"] - 1.0
     ) * 100.0
 
-    scored["service_depth"] = scored["component_tourism_depth"]
     scored["stability"] = scored["component_safety_stability"]
     scored["quality_adjusted_value"] = scored["component_overall_value"]
 
@@ -179,12 +184,15 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     meta["origin_fallback_used"] = origin_context["origin_fallback_used"]
     meta["origin_pp_multiplier"] = float(origin_context["origin_pp_multiplier"])
     meta["origin_currency"] = origin_currency
-    meta["model_contract"] = "phase_3_quality_adjusted_purchasing_power_basic_comfort"
+    meta["model_contract"] = "phase_4_quality_adjusted_purchasing_power_service_depth"
     meta["daily_cost_estimate_removed"] = True
     meta["fx_opportunity_horizons"] = ["1w", "1m", "3m", "1y", "3y"]
     meta["fx_opportunity_max_ranking_effect"] = FX_MAX_RANKING_EFFECT
     meta["basic_comfort_pillars"] = ["water", "sanitation", "electricity", "internet", "health"]
     meta["basic_comfort_legacy_gdp_proxy_is_fallback_only"] = True
+    meta["service_depth_primary_source"] = "WEF TTDI 2024 Tourist Services and Infrastructure"
+    meta["service_depth_arrivals_are_fallback_only"] = True
+    meta["service_depth_ttdi_source_year"] = 2024
 
     if include_meta:
         return {"meta": meta, "results": results}
