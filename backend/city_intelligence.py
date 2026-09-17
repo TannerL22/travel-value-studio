@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
 import math
 import os
@@ -21,40 +22,48 @@ JRC_CITY_STATS_ZIP = (
 )
 OVERTURE_STAC = "https://stac.overturemaps.org/catalog.json"
 OVERTURE_FALLBACK_RELEASE = "2026-08-19.0"
-CITY_DATA_CACHE_TTL_SECONDS = int(os.getenv("CITY_DATA_CACHE_TTL_SECONDS", "86400"))
-OVERTURE_AMENITY_CACHE_TTL_SECONDS = int(os.getenv("OVERTURE_AMENITY_CACHE_TTL_SECONDS", "86400"))
+CITY_DATA_CACHE_TTL_SECONDS = int(os.getenv("CITY_DATA_CACHE_TTL_SECONDS", "604800"))
+OVERTURE_AMENITY_CACHE_TTL_SECONDS = int(os.getenv("OVERTURE_AMENITY_CACHE_TTL_SECONDS", "604800"))
 OVERTURE_CONFIDENCE_MIN = float(os.getenv("OVERTURE_CONFIDENCE_MIN", "0.75"))
 CITY_CANDIDATE_LIMIT = int(os.getenv("CITY_CANDIDATE_LIMIT", "12"))
+CITY_AMENITY_MAX_WORKERS = int(os.getenv("CITY_AMENITY_MAX_WORKERS", "4"))
 
 # Phase 5 uses broad taxonomy branches so it survives category-level churn.
+# These are discovery weights, not claims about universal quality-of-life utility.
 AMENITY_GROUPS: Dict[str, Dict[str, object]] = {
     "food_drink": {
         "hierarchy": ["food_and_drink"],
-        "weight": 0.30,
+        "weight": 0.27,
         "per_10k_target": 35.0,
         "per_km2_target": 8.0,
     },
     "shopping": {
         "hierarchy": ["shopping"],
-        "weight": 0.22,
+        "weight": 0.20,
         "per_10k_target": 30.0,
         "per_km2_target": 6.0,
     },
     "health_care": {
         "hierarchy": ["health_care"],
-        "weight": 0.16,
+        "weight": 0.15,
         "per_10k_target": 10.0,
         "per_km2_target": 2.0,
     },
     "recreation_culture": {
         "hierarchy": ["sports_and_recreation", "arts_and_entertainment", "cultural_and_historic"],
-        "weight": 0.22,
+        "weight": 0.20,
         "per_10k_target": 14.0,
         "per_km2_target": 3.0,
     },
+    "lifestyle_services": {
+        "hierarchy": ["lifestyle_services"],
+        "weight": 0.10,
+        "per_10k_target": 10.0,
+        "per_km2_target": 2.0,
+    },
     "lodging": {
         "hierarchy": ["lodging"],
-        "weight": 0.10,
+        "weight": 0.08,
         "per_10k_target": 5.0,
         "per_km2_target": 1.0,
     },
@@ -196,8 +205,6 @@ def _canonicalize_city_sheet(frame: pd.DataFrame, target_year: int = 2025) -> pd
     out["country_name"] = frame[country_name_col].astype(str) if country_name_col else None
     out["reference_year"] = int(target_year)
 
-    # GHSL/JRC tables use absolute population counts. If a source variant stores
-    # thousands, the implausibly low median makes that visible and we repair it.
     numeric_pop = out["population"].dropna()
     if not numeric_pop.empty and numeric_pop.median() < 10_000:
         out["population"] = out["population"] * 1000.0
@@ -265,13 +272,14 @@ def fetch_city_universe(force_refresh: bool = False) -> Tuple[pd.DataFrame, str]
 
 
 def city_bbox(lat: float, lon: float, area_km2: float) -> Tuple[float, float, float, float, float]:
-    """Create a conservative bbox from the population-weighted centroid and city land area.
+    """Equivalent-area circle around the JRC population-weighted city centroid.
 
-    Phase 5 deliberately labels this as a proxy footprint. Exact GHS-WUP urban-centre
-    polygons can replace it later without changing the endpoint contract.
+    The bounding box is used only for Parquet predicate pushdown. The Overture SQL
+    applies a second approximate circular filter so counts are not taken from the
+    entire rectangle and then divided by the smaller official city area.
     """
     equivalent_radius_km = math.sqrt(max(float(area_km2), 1.0) / math.pi)
-    query_radius_km = float(np.clip(equivalent_radius_km * 1.20, 2.5, 85.0))
+    query_radius_km = float(np.clip(equivalent_radius_km, 2.5, 85.0))
     lat_delta = query_radius_km / 111.32
     lon_scale = max(0.15, math.cos(math.radians(float(lat))))
     lon_delta = query_radius_km / (111.32 * lon_scale)
@@ -306,6 +314,9 @@ def _query_overture_counts(
     bbox: Tuple[float, float, float, float],
     release: str,
     confidence_min: float,
+    centroid_lat: float,
+    centroid_lon: float,
+    radius_km: float,
 ) -> Dict[str, int]:
     try:
         import duckdb
@@ -313,10 +324,7 @@ def _query_overture_counts(
         raise RuntimeError("duckdb_not_installed") from exc
 
     xmin, ymin, xmax, ymax = bbox
-    path = (
-        "s3://overturemaps-us-west-2/release/"
-        f"{release}/theme=places/type=place/*"
-    )
+    path = "s3://overturemaps-us-west-2/release/" f"{release}/theme=places/type=place/*"
     group_sql = ",\n            ".join(
         _group_case_sql(group, spec["hierarchy"])  # type: ignore[arg-type]
         for group, spec in AMENITY_GROUPS.items()
@@ -330,6 +338,10 @@ def _query_overture_counts(
           AND bbox.ymin BETWEEN ? AND ?
           AND COALESCE(confidence, 0.0) >= ?
           AND COALESCE(operating_status, 'open') <> 'permanently_closed'
+          AND (
+              POWER((bbox.ymin - ?) * 111.32, 2)
+              + POWER((bbox.xmin - ?) * 111.32 * COS(RADIANS(?)), 2)
+          ) <= POWER(?, 2)
     """
 
     connection = duckdb.connect(database=":memory:")
@@ -339,7 +351,10 @@ def _query_overture_counts(
         connection.execute("SET s3_region='us-west-2'")
         row = connection.execute(
             sql,
-            [float(xmin), float(xmax), float(ymin), float(ymax), float(confidence_min)],
+            [
+                float(xmin), float(xmax), float(ymin), float(ymax), float(confidence_min),
+                float(centroid_lat), float(centroid_lon), float(centroid_lat), float(radius_km),
+            ],
         ).fetchone()
     finally:
         connection.close()
@@ -412,18 +427,24 @@ def add_city_amenities(city: Dict[str, object], force_refresh: bool = False) -> 
             (xmin, ymin, xmax, ymax),
             release=release,
             confidence_min=OVERTURE_CONFIDENCE_MIN,
+            centroid_lat=lat,
+            centroid_lon=lon,
+            radius_km=radius_km,
         )
         scored = score_city_amenities(counts, population=population, area_km2=area_km2)
+        flags = ["proxy_city_footprint"]
+        if int(scored.get("amenity_total", 0)) < 50:
+            flags.append("thin_overture_sample")
         amenity = {
             **scored,
             "amenity_source": "overture_places",
             "amenity_release": release,
             "amenity_release_source": release_source,
             "amenity_confidence_min": OVERTURE_CONFIDENCE_MIN,
-            "amenity_coverage": 1.0,
-            "amenity_footprint_method": "centroid_area_bbox_proxy",
+            "amenity_query_success": True,
+            "amenity_footprint_method": "equivalent_area_circle_proxy",
             "amenity_query_radius_km": round(radius_km, 2),
-            "amenity_flags": ["proxy_city_footprint"],
+            "amenity_flags": flags,
         }
     except Exception as exc:
         amenity = {
@@ -432,8 +453,8 @@ def add_city_amenities(city: Dict[str, object], force_refresh: bool = False) -> 
             "amenity_release": release,
             "amenity_release_source": release_source,
             "amenity_confidence_min": OVERTURE_CONFIDENCE_MIN,
-            "amenity_coverage": 0.0,
-            "amenity_footprint_method": "centroid_area_bbox_proxy",
+            "amenity_query_success": False,
+            "amenity_footprint_method": "equivalent_area_circle_proxy",
             "amenity_query_radius_km": round(radius_km, 2),
             "amenity_flags": [f"overture_query_failed:{type(exc).__name__}", "proxy_city_footprint"],
         }
@@ -469,17 +490,36 @@ def get_country_cities(
         }
 
     candidates = country.sort_values("population", ascending=False).head(max(limit, CITY_CANDIDATE_LIMIT))
-    records: List[Dict[str, object]] = []
+    clean_records: List[Dict[str, object]] = []
     for row in candidates.to_dict(orient="records"):
-        clean = {
-            key: (None if pd.isna(value) else value)
-            for key, value in row.items()
-        }
-        record = add_city_amenities(clean) if include_amenities else clean
-        records.append(record)
+        clean_records.append({key: (None if pd.isna(value) else value) for key, value in row.items()})
 
-    if include_amenities and any(record.get("amenity_depth") is not None for record in records):
-        records.sort(
+    if include_amenities:
+        records: List[Optional[Dict[str, object]]] = [None] * len(clean_records)
+        workers = min(max(1, CITY_AMENITY_MAX_WORKERS), len(clean_records))
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                executor.submit(add_city_amenities, record): index
+                for index, record in enumerate(clean_records)
+            }
+            for future in as_completed(futures):
+                index = futures[future]
+                try:
+                    records[index] = future.result()
+                except Exception as exc:
+                    records[index] = {
+                        **clean_records[index],
+                        "amenity_depth": None,
+                        "amenity_source": "unavailable",
+                        "amenity_query_success": False,
+                        "amenity_flags": [f"amenity_worker_failed:{type(exc).__name__}"],
+                    }
+        resolved = [record for record in records if record is not None]
+    else:
+        resolved = clean_records
+
+    if include_amenities and any(record.get("amenity_depth") is not None for record in resolved):
+        resolved.sort(
             key=lambda item: (
                 item.get("amenity_depth") is not None,
                 float(item.get("amenity_depth") or -1.0),
@@ -487,16 +527,25 @@ def get_country_cities(
             ),
             reverse=True,
         )
+        observed_rank = 0
+        for record in resolved:
+            if record.get("amenity_depth") is not None:
+                observed_rank += 1
+                record["amenity_rank_within_country"] = observed_rank
+            else:
+                record["amenity_rank_within_country"] = None
     else:
-        records.sort(key=lambda item: float(item.get("population") or 0.0), reverse=True)
+        resolved.sort(key=lambda item: float(item.get("population") or 0.0), reverse=True)
+        for record in resolved:
+            record["amenity_rank_within_country"] = None
 
-    return records[:limit], {
+    return resolved[:limit], {
         "city_source": "JRC GHS-WUP-MTUC R2025A V1.1 / UN WUP 2025 framework",
         "city_source_warning": warning,
         "city_reference_year": 2025,
         "city_count_in_country": int(len(country)),
         "candidate_count": int(len(candidates)),
-        "amenity_source": "Overture Maps Places",
-        "amenity_footprint_method": "centroid_area_bbox_proxy",
+        "amenity_source": "Overture Maps Places latest STAC release",
+        "amenity_footprint_method": "equivalent_area_circle_proxy",
         "amenity_score_status": "city discovery signal; not yet part of country ranking",
     }
