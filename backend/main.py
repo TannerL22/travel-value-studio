@@ -7,11 +7,12 @@ from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from basic_comfort import add_basic_comfort_v3, apply_basic_comfort_to_ranking
+from city_intelligence import get_country_cities
 from data_sources import (
     add_origin_fx_tailwind_diagnostics,
     build_dataset,
@@ -24,8 +25,8 @@ from fx_opportunity import (
     add_fx_opportunity_v2,
     apply_fx_opportunity_to_ranking,
 )
-from model_contract import phase_4_methodology
-from phase4_registry import get_phase4_source_registry
+from model_contract import phase_5_methodology
+from phase5_registry import get_phase5_source_registry
 from service_depth import (
     add_service_depth_v4,
     align_data_quality_with_service_depth,
@@ -118,12 +119,34 @@ def get_origins() -> Any:
 
 @app.get("/api/source-registry")
 def get_api_source_registry() -> Any:
-    return get_phase4_source_registry()
+    return get_phase5_source_registry()
 
 
 @app.get("/api/methodology")
 def get_api_methodology() -> Any:
-    return phase_4_methodology(get_methodology_summary())
+    return phase_5_methodology(get_methodology_summary())
+
+
+@app.get("/api/cities/{country_iso3}")
+def get_cities(
+    country_iso3: str,
+    limit: int = Query(default=6, ge=1, le=20),
+    include_amenities: int = Query(default=1, ge=0, le=1),
+) -> Any:
+    cities, meta = get_country_cities(
+        country_iso3=country_iso3,
+        limit=limit,
+        include_amenities=bool(include_amenities),
+    )
+    return {
+        "meta": {
+            **meta,
+            "country_iso3": str(country_iso3).upper().strip(),
+            "model_contract": "phase_5_quality_adjusted_purchasing_power_city_intelligence",
+            "city_amenities_affect_country_ranking": False,
+        },
+        "results": cities,
+    }
 
 
 @app.post("/api/rankings")
@@ -189,7 +212,7 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     meta["origin_fallback_used"] = origin_context["origin_fallback_used"]
     meta["origin_pp_multiplier"] = float(origin_context["origin_pp_multiplier"])
     meta["origin_currency"] = origin_currency
-    meta["model_contract"] = "phase_4_quality_adjusted_purchasing_power_service_depth"
+    meta["model_contract"] = "phase_5_quality_adjusted_purchasing_power_city_intelligence"
     meta["daily_cost_estimate_removed"] = True
     meta["fx_opportunity_horizons"] = ["1w", "1m", "3m", "1y", "3y"]
     meta["fx_opportunity_max_ranking_effect"] = FX_MAX_RANKING_EFFECT
@@ -198,6 +221,8 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     meta["service_depth_primary_source"] = "WEF TTDI 2024 Tourist Services and Infrastructure"
     meta["service_depth_arrivals_are_fallback_only"] = True
     meta["service_depth_ttdi_source_year"] = 2024
+    meta["city_intelligence_endpoint"] = "/api/cities/{country_iso3}"
+    meta["city_amenities_affect_country_ranking"] = False
 
     if include_meta:
         return {"meta": meta, "results": results}
