@@ -51,7 +51,6 @@ export function WorldMap({ results, onCountryClick, activeCountryKey = null, onC
 
   useEffect(() => {
     let active = true;
-    setMapStatus("loading");
     fetch("/world.geojson")
       .then((response) => {
         if (!response.ok) throw new Error("Map data request failed");
@@ -116,14 +115,9 @@ export function WorldMap({ results, onCountryClick, activeCountryKey = null, onC
       .map((country) => country.key),
     [mapPaths],
   );
-
-  useEffect(() => {
-    if (keyboardOrder.length === 0) {
-      setKeyboardKey(null);
-      return;
-    }
-    if (!keyboardKey || !keyboardOrder.includes(keyboardKey)) setKeyboardKey(keyboardOrder[0]);
-  }, [keyboardKey, keyboardOrder]);
+  const effectiveKeyboardKey = keyboardKey && keyboardOrder.includes(keyboardKey)
+    ? keyboardKey
+    : (keyboardOrder[0] ?? null);
 
   const updateTooltipPosition = (country: RankingRow, clientX: number, clientY: number) => {
     const bounds = containerRef.current?.getBoundingClientRect();
@@ -169,7 +163,7 @@ export function WorldMap({ results, onCountryClick, activeCountryKey = null, onC
             <path d={mapPaths.graticulePath} fill="none" stroke="#ffffff08" strokeWidth={0.6} />
             {mapPaths.countries.map((country) => {
               const active = country.data != null && countryKey(country.data) === activeCountryKey?.toUpperCase();
-              const keyboardActive = country.data != null && country.key === keyboardKey;
+              const keyboardActive = country.data != null && country.key === effectiveKeyboardKey;
               return (
                 <path
                   key={country.key}
