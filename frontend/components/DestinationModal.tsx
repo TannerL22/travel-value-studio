@@ -22,6 +22,25 @@ type ComponentRow = {
   note: string;
 };
 
+type FxV2Row = RankingRow & {
+  fx_opportunity_signal?: number | null;
+  fx_opportunity_multiplier?: number | null;
+  fx_opportunity_coverage?: number | null;
+  fx_opportunity_source?: string | null;
+  fx_opportunity_interpretation?: string | null;
+  fx_opportunity_latest_date?: string | null;
+  fx_opportunity_1w_pct?: number | null;
+  fx_opportunity_1m_pct?: number | null;
+  fx_opportunity_3m_pct?: number | null;
+  fx_opportunity_1y_pct?: number | null;
+  fx_opportunity_3y_pct?: number | null;
+  fx_opportunity_1w_date?: string | null;
+  fx_opportunity_1m_date?: string | null;
+  fx_opportunity_3m_date?: string | null;
+  fx_opportunity_1y_date?: string | null;
+  fx_opportunity_3y_date?: string | null;
+};
+
 const clampScore = (value: number | null | undefined) => {
   if (value == null || !Number.isFinite(value)) return null;
   return Math.max(0, Math.min(100, value));
@@ -29,8 +48,13 @@ const clampScore = (value: number | null | undefined) => {
 
 const formatFxPercent = (value: number | null | undefined) => {
   if (value == null || !Number.isFinite(value)) return "N/A";
-  const rounded = Math.round(value);
+  const rounded = Math.round(value * 10) / 10;
   return `${rounded > 0 ? "+" : ""}${rounded}%`;
+};
+
+const formatMultiplierImpact = (value: number | null | undefined) => {
+  if (value == null || !Number.isFinite(value)) return "N/A";
+  return formatFxPercent((value - 1) * 100);
 };
 
 function ComponentBar({ label, value, note }: ComponentRow) {
@@ -60,6 +84,7 @@ export function DestinationModal({
 }: DestinationModalProps) {
   if (!isOpen) return null;
 
+  const fx = country as FxV2Row;
   const purchasingPower = country.structural_purchasing_power ?? country.value_multiplier_relative ?? null;
   const quality = ((country.service_depth ?? country.component_tourism_depth ?? 0) + (country.stability ?? country.component_safety_stability ?? 0)) / 200;
   const similar = allResults
@@ -82,7 +107,7 @@ export function DestinationModal({
     {
       label: "FX Opportunity",
       value: country.fx_opportunity ?? country.component_fx_tailwind,
-      note: "Origin-aware historical FX diagnostic where available. Phase 2 will add shorter horizons and make this directly affect ranking.",
+      note: "Phase 2 bilateral timing score across 1W, 1M, 3M, 1Y, and 3Y. It now directly affects ranking with a bounded multiplier.",
     },
     {
       label: "PPP Advantage",
@@ -92,12 +117,12 @@ export function DestinationModal({
     {
       label: "Basic Comfort",
       value: country.basic_comfort ?? country.component_comfort_floor,
-      note: "Phase 1 still uses the legacy GDP-PPP development floor as a proxy.",
+      note: "Still uses the legacy GDP-PPP development floor as a proxy until Phase 3.",
     },
     {
       label: "Service Depth",
       value: country.service_depth ?? country.component_tourism_depth,
-      note: "Phase 1 still relies mainly on international arrivals as a service-availability proxy.",
+      note: "Still relies mainly on international arrivals as a service-availability proxy until Phase 4.",
     },
     {
       label: "Stability",
@@ -107,19 +132,23 @@ export function DestinationModal({
     {
       label: "Quality-Adjusted Value",
       value: country.quality_adjusted_value ?? country.component_overall_value ?? country.Score,
-      note: "Current production score, relabelled accurately in Phase 1; scoring architecture is rebuilt in later phases.",
+      note: "Structural value after the bounded FX timing overlay, normalized to a 0-100 ranking score.",
     },
   ];
 
-  const fxSource = country.component_fx_tailwind_source === "origin_historical_fx"
-    ? "Origin FX"
-    : country.component_fx_tailwind_source === "usd_historical_fx"
-      ? "USD FX"
-      : "Model proxy";
-  const hasOriginFx =
-    country.component_fx_tailwind_source === "origin_historical_fx" &&
-    country.fx_tailwind_origin_source === "HISTORICAL_CROSS" &&
-    country.fx_tailwind_origin_currency;
+  const fxSource = fx.fx_opportunity_source === "frankfurter_v2_origin_cross"
+    ? "Frankfurter v2 · origin cross"
+    : fx.fx_opportunity_source === "legacy_historical_fx"
+      ? "Legacy historical FX"
+      : "Unavailable";
+
+  const horizons = [
+    ["1W", fx.fx_opportunity_1w_pct, fx.fx_opportunity_1w_date],
+    ["1M", fx.fx_opportunity_1m_pct, fx.fx_opportunity_1m_date],
+    ["3M", fx.fx_opportunity_3m_pct, fx.fx_opportunity_3m_date],
+    ["1Y", fx.fx_opportunity_1y_pct, fx.fx_opportunity_1y_date],
+    ["3Y", fx.fx_opportunity_3y_pct, fx.fx_opportunity_3y_date],
+  ] as const;
 
   return (
     <AnimatePresence>
@@ -171,23 +200,41 @@ export function DestinationModal({
             </div>
 
             <div className="mb-7 rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-300">FX Opportunity</p>
-                <span className="rounded-full bg-white/5 px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-zinc-400">{fxSource}</span>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-300">FX Opportunity · Phase 2</p>
+                  <p className="mt-1 text-xs text-zinc-300">{fx.fx_opportunity_interpretation ?? "FX opportunity unavailable"}</p>
+                </div>
+                <span className="rounded-full bg-white/5 px-2 py-1 text-[9px] uppercase tracking-[0.12em] text-zinc-400">{fxSource}</span>
               </div>
-              <p className="mt-2 text-xs leading-5 text-zinc-300">
-                {hasOriginFx ? country.fx_tailwind_origin_interpretation : country.fx_tailwind_interpretation ?? "FX tailwind is using the current model proxy."}
+
+              <div className="mt-3 grid grid-cols-5 gap-2">
+                {horizons.map(([label, move, referenceDate]) => (
+                  <div key={label} className="rounded-md bg-white/5 p-2 text-center" title={referenceDate ?? undefined}>
+                    <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-500">{label}</p>
+                    <p className="mt-1 text-xs font-semibold text-white">{formatFxPercent(move)}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-2 text-[10px]">
+                <div className="rounded-md border border-white/5 p-2">
+                  <p className="uppercase tracking-[0.12em] text-zinc-500">FX score</p>
+                  <p className="mt-1 font-semibold text-white">{fx.fx_opportunity != null ? Math.round(fx.fx_opportunity) : "N/A"}</p>
+                </div>
+                <div className="rounded-md border border-white/5 p-2">
+                  <p className="uppercase tracking-[0.12em] text-zinc-500">Rank impact</p>
+                  <p className="mt-1 font-semibold text-white">{formatMultiplierImpact(fx.fx_opportunity_multiplier)}</p>
+                </div>
+                <div className="rounded-md border border-white/5 p-2">
+                  <p className="uppercase tracking-[0.12em] text-zinc-500">Coverage</p>
+                  <p className="mt-1 font-semibold text-white">{fx.fx_opportunity_coverage != null ? `${Math.round(fx.fx_opportunity_coverage * 100)}%` : "N/A"}</p>
+                </div>
+              </div>
+
+              <p className="mt-3 text-[10px] leading-4 text-zinc-500">
+                Positive moves mean your selected origin currency buys more destination currency than at that reference point. Latest reference: {fx.fx_opportunity_latest_date ?? "N/A"}. The ranking overlay is capped so FX timing cannot dominate structural value.
               </p>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="rounded-md bg-white/5 p-2">
-                  <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-500">1Y move</p>
-                  <p className="mt-1 font-semibold text-white">{formatFxPercent(hasOriginFx ? country.fx_tailwind_origin_1y_pct : country.fx_tailwind_1y_pct)}</p>
-                </div>
-                <div className="rounded-md bg-white/5 p-2">
-                  <p className="text-[9px] uppercase tracking-[0.12em] text-zinc-500">3Y move</p>
-                  <p className="mt-1 font-semibold text-white">{formatFxPercent(hasOriginFx ? country.fx_tailwind_origin_3y_pct : country.fx_tailwind_3y_pct)}</p>
-                </div>
-              </div>
             </div>
 
             <div>
