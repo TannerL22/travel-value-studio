@@ -55,14 +55,15 @@ For water and sanitation, Phase 7.1 corrects the treatment of World Bank/JMP nes
 - when both are available, the pillar is 65% basic access and 35% safely-managed quality;
 - if only one standard is available, the observed score is retained with lower evidence reliability rather than treating the missing standard as zero.
 
-The preference penalty retains the Phase 3 requirement curve:
+The Phase 7.1 preference curve is deliberately smoother than the original Phase 3/7 implementation:
 
-- requirement threshold rises from 55 to 90;
+- requirement threshold rises from **60 to 85**;
+- penalty convexity increases only modestly as Comfort Requirement rises;
 - destinations above the selected threshold receive no extra reward;
-- lower scores receive a stronger penalty as Comfort Requirement rises;
+- lower scores still receive a materially stronger penalty as Comfort Requirement rises;
 - direct-data coverage controls how much of the penalty can be applied.
 
-Because these inputs are directly relevant to basic liveability, Basic Comfort is not given the proxy haircut cap used below.
+Because these inputs are directly relevant to basic liveability, Basic Comfort is not given the proxy haircut cap used below. Very poor basic-service foundations can still receive a severe penalty at maximum user concern.
 
 ### Service Depth
 
@@ -169,14 +170,15 @@ City Usability:
 3. Stability Priority zero is exactly neutral.
 4. Missing stability evidence cannot create a penalty.
 5. Service Depth and Stability have explicit maximum-haircut floors so neither partial proxy can become a single-factor veto.
-6. High Comfort and Service requirements can still overturn a superficially cheaper but unusable destination.
-7. Legacy GDP values and the legacy score cannot affect Phase 7 ordering when current Phase 7 evidence is identical.
-8. Legacy-score availability cannot determine the production country universe.
-9. Cheapness Priority changes the strength, not the direction, of the purchasing-power signal.
-10. Water/sanitation basic access is not erased by a stricter safely-managed observation.
-11. City Usability requires city Amenity Depth.
-12. Missing Mobility/Digital evidence reduces coverage rather than forcing City Usability to zero.
-13. City Usability ordering responds monotonically to stronger observed usability evidence.
+6. The Comfort control remains strong for genuinely poor foundations but is smooth for ordinary preference adjustments.
+7. High Comfort and Service requirements can still overturn a superficially cheaper but unusable destination.
+8. Legacy GDP values and the legacy score cannot affect Phase 7 ordering when current Phase 7 evidence is identical.
+9. Legacy-score availability cannot determine the production country universe.
+10. Cheapness Priority changes the strength, not the direction, of the purchasing-power signal.
+11. Water/sanitation basic access is not erased by a stricter safely-managed observation.
+12. City Usability requires city Amenity Depth.
+13. Missing Mobility/Digital evidence reduces coverage rather than forcing City Usability to zero.
+14. City Usability ordering responds monotonically to stronger observed usability evidence.
 
 These are structural tests rather than claims that any particular country "should" occupy a specific rank.
 
@@ -192,6 +194,8 @@ These are structural tests rather than claims that any particular country "shoul
 - evidence-level face-validity diagnostics for selected destinations.
 
 The empirical audit is intentionally diagnostic rather than a target-fitting exercise. Calibration changes should be justified by what an input actually measures and by pathological sensitivity, not by forcing a preferred country ordering.
+
+In the post-Phase-7.1 live audit, normal ±0.20 changes preserved 18–19 of the top 20 destinations for each control. Basic Comfort still produces large tail-rank moves for countries with genuinely weak living-foundation evidence; this is intentional and is distinguished from the much more bounded Service Depth and Stability proxy effects.
 
 ## Validation philosophy
 
