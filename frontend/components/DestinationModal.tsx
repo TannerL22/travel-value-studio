@@ -42,6 +42,16 @@ type DetailRow = RankingRow & {
   comfort_electricity_score?: number | null;
   comfort_internet_score?: number | null;
   comfort_health_score?: number | null;
+  service_depth_direct?: number | null;
+  service_depth_coverage?: number | null;
+  service_depth_source?: string | null;
+  service_depth_reference_year?: number | null;
+  service_depth_penalty?: number | null;
+  service_depth_requirement_threshold?: number | null;
+  service_depth_ttdi_2024_value?: number | null;
+  service_depth_ttdi_2024_rank?: number | null;
+  service_depth_arrivals_per_100?: number | null;
+  service_depth_arrivals_fallback_score?: number | null;
 };
 
 type ComponentRow = {
@@ -120,7 +130,7 @@ export function DestinationModal({ country, isOpen, onClose, allResults, imageUr
     {
       label: "Service Depth",
       value: country.service_depth ?? country.component_tourism_depth,
-      note: "Still relies mainly on international arrivals until Phase 4 replaces it with measured service and amenity supply.",
+      note: "Phase 4 supply signal. WEF TTDI Tourist Services & Infrastructure is preferred; arrivals per resident are only a reduced-confidence fallback.",
     },
     {
       label: "Stability",
@@ -130,7 +140,7 @@ export function DestinationModal({ country, isOpen, onClose, allResults, imageUr
     {
       label: "Quality-Adjusted Value",
       value: country.quality_adjusted_value ?? country.component_overall_value ?? country.Score,
-      note: "Structural value after the Phase 3 comfort floor and bounded Phase 2 FX timing overlay.",
+      note: "Structural value after Basic Comfort and Service Depth shortfall penalties plus the bounded FX timing overlay.",
     },
   ];
 
@@ -158,6 +168,16 @@ export function DestinationModal({ country, isOpen, onClose, allResults, imageUr
     : detail.basic_comfort_source === "blended_direct_legacy"
       ? "Direct + legacy fallback"
       : "Legacy fallback";
+  const serviceSource = detail.service_depth_source === "wef_ttdi_2024_tourist_services"
+    ? "WEF TTDI 2024"
+    : detail.service_depth_source === "arrivals_per_capita_fallback"
+      ? "Arrivals fallback"
+      : "Unavailable";
+  const serviceEvidence = detail.service_depth_ttdi_2024_value != null
+    ? `${detail.service_depth_ttdi_2024_value.toFixed(2)} / 7 TTDI`
+    : detail.service_depth_arrivals_per_100 != null
+      ? `${detail.service_depth_arrivals_per_100.toFixed(1)} arrivals / 100 residents`
+      : "N/A";
 
   return (
     <AnimatePresence>
@@ -209,6 +229,20 @@ export function DestinationModal({ country, isOpen, onClose, allResults, imageUr
                 <div className="rounded-md border border-white/5 p-2"><p className="uppercase tracking-[0.12em] text-zinc-500">Rank impact</p><p className="mt-1 font-semibold text-white">{detail.basic_comfort_penalty != null ? formatFxPercent((detail.basic_comfort_penalty - 1) * 100) : "N/A"}</p></div>
               </div>
               <p className="mt-3 text-[10px] leading-4 text-zinc-500">Pillars saturate once a strong baseline is reached, so already-excellent countries do not receive endless development bonuses. Missing direct evidence blends toward the legacy GDP-PPP proxy rather than being scored as zero.</p>
+            </div>
+
+            <div className="mb-7 rounded-xl border border-blue-400/10 bg-blue-400/5 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-300">Service Depth · Phase 4</p><p className="mt-1 text-xs text-zinc-300">Can cheapness be converted into readily available accommodation and established services?</p></div>
+                <span className="rounded-full bg-white/5 px-2 py-1 text-[9px] uppercase tracking-[0.12em] text-zinc-400">{serviceSource}</span>
+              </div>
+              <div className="mt-3 grid grid-cols-4 gap-2 text-[10px]">
+                <div className="rounded-md border border-white/5 p-2"><p className="uppercase tracking-[0.12em] text-zinc-500">Service score</p><p className="mt-1 font-semibold text-white">{detail.service_depth != null ? Math.round(detail.service_depth) : "N/A"}</p></div>
+                <div className="rounded-md border border-white/5 p-2"><p className="uppercase tracking-[0.12em] text-zinc-500">Evidence</p><p className="mt-1 font-semibold text-white">{serviceEvidence}</p></div>
+                <div className="rounded-md border border-white/5 p-2"><p className="uppercase tracking-[0.12em] text-zinc-500">Coverage</p><p className="mt-1 font-semibold text-white">{detail.service_depth_coverage != null ? `${Math.round(detail.service_depth_coverage * 100)}%` : "N/A"}</p></div>
+                <div className="rounded-md border border-white/5 p-2"><p className="uppercase tracking-[0.12em] text-zinc-500">Rank impact</p><p className="mt-1 font-semibold text-white">{detail.service_depth_penalty != null ? formatFxPercent((detail.service_depth_penalty - 1) * 100) : "N/A"}</p></div>
+              </div>
+              <p className="mt-3 text-[10px] leading-4 text-zinc-500">WEF TTDI 2024 is the preferred country-level supply benchmark. Arrivals per resident are used only outside TTDI coverage and receive 45% evidence weight. Missing evidence is neutral. Reference year: {detail.service_depth_reference_year ?? "N/A"}.</p>
             </div>
 
             <div className="mb-7 rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-4">
