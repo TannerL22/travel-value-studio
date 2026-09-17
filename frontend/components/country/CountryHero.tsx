@@ -24,26 +24,26 @@ export function CountryHero({ country, backHref, compareHref, methodologyHref, i
   return (
     <section className="overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/55">
       <div className="grid lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]">
-        <div className="p-6 sm:p-8 lg:p-10">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link href={backHref} className="inline-flex items-center gap-2 text-sm text-zinc-400 transition hover:text-white">
+        <div className="p-5 sm:p-8 lg:p-10">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <Link href={backHref} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm text-zinc-300 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
               <ArrowLeft className="h-4 w-4" /> Back to Discover
             </Link>
-            <Link href={compareHref} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-zinc-300 transition hover:border-white/20 hover:text-white">
+            <Link href={compareHref} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-zinc-200 transition hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 sm:justify-start">
               <GitCompareArrows className="h-4 w-4" /> Compare this destination
             </Link>
           </div>
 
-          <div className="mt-8 flex flex-wrap items-center gap-3 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+          <div className="mt-7 flex flex-wrap items-center gap-3 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-400 sm:mt-8">
             <span>{country.iso3 ?? ""}</span>
             {country.rank != null ? <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1">Global value rank #{country.rank}</span> : null}
           </div>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-5xl">{name}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
+          <h1 className="mt-3 break-words text-4xl font-semibold tracking-tight text-white sm:text-5xl">{name}</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-300">
             Current destination value relative to {referenceLabel}. The score combines purchasing power with preference-controlled comfort, service, stability and FX effects.
           </p>
 
-          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-4">
             <HeroMetric label="Value score" value={valueScore != null ? Math.round(valueScore).toString() : "N/A"} />
             <HeroMetric label="Purchasing power" value={pp != null ? `${pp.toFixed(2)}×` : "N/A"} />
             <HeroMetric label="FX rank effect" value={formatFxRankingEffect(country)} />
@@ -51,17 +51,17 @@ export function CountryHero({ country, backHref, compareHref, methodologyHref, i
           </div>
         </div>
 
-        <div className="relative min-h-64 border-t border-white/10 lg:min-h-full lg:border-l lg:border-t-0">
+        <div className="relative min-h-72 border-t border-white/10 lg:min-h-full lg:border-l lg:border-t-0">
           {imageUrl ? (
-            <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${imageUrl})` }} />
+            <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${imageUrl})` }} role="img" aria-label={`${name} destination image`} />
           ) : (
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(34,211,238,0.18),transparent_45%),linear-gradient(145deg,#18181b,#09090b)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(34,211,238,0.18),transparent_45%),linear-gradient(145deg,#18181b,#09090b)]" aria-hidden="true" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" />
-          <div className="absolute bottom-5 left-5 right-5 rounded-2xl border border-white/10 bg-zinc-950/70 p-4 backdrop-blur-md">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Important scope note</p>
-            <p className="mt-2 text-sm leading-5 text-zinc-300">Temporary furnished housing for 30–90 day stays is not yet modeled.</p>
-            <Link href={methodologyHref} className="mt-3 inline-flex items-center gap-1.5 text-xs text-cyan-300 hover:text-cyan-200">
+          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" aria-hidden="true" />
+          <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/10 bg-zinc-950/80 p-4 backdrop-blur-md sm:bottom-5 sm:left-5 sm:right-5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400">Important scope note</p>
+            <p className="mt-2 text-sm leading-5 text-zinc-200">Temporary furnished housing for 30–90 day stays is not yet modeled.</p>
+            <Link href={methodologyHref} className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-md text-xs text-cyan-200 hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
               Model scope <ExternalLink className="h-3 w-3" />
             </Link>
           </div>
@@ -75,7 +75,7 @@ function HeroMetric({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-2xl font-semibold tabular-nums tracking-tight text-white sm:text-3xl">{value}</p>
-      <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-zinc-500">{label}</p>
+      <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-zinc-400">{label}</p>
     </div>
   );
 }
