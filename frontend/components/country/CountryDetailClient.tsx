@@ -59,7 +59,7 @@ export function CountryDetailClient({ iso3, queryString }: { iso3: string; query
   if (!country) {
     return (
       <div className="mx-auto max-w-3xl py-16 text-center" role="status">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">Destination unavailable</p>
+        <p className="text-sm font-medium text-zinc-400">Destination unavailable</p>
         <h1 className="mt-3 text-3xl font-semibold text-white">{iso3.toUpperCase()}</h1>
         <p className="mt-3 text-sm leading-6 text-zinc-400">This destination is not present in the current ranking universe for the selected model configuration.</p>
         <Link href={backHref} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-md text-sm text-cyan-200 hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"><ArrowLeft className="h-4 w-4" /> Back to Discover</Link>
@@ -71,13 +71,13 @@ export function CountryDetailClient({ iso3, queryString }: { iso3: string; query
     <div className="space-y-12 pb-10 sm:space-y-16">
       <CountryHero country={country} backHref={backHref} compareHref={compareHref} methodologyHref={methodologyHref} imageUrl={imageUrl} referenceLabel={referenceLabel} />
 
-      <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4 sm:px-6" aria-label="Active ranking preferences">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-400">
-          <span><strong className="font-medium text-zinc-200">Reference:</strong> {referenceLabel}</span>
-          <span><strong className="font-medium text-zinc-200">Value:</strong> {preferenceLevel("budget_sens", filters.budget_sens)}</span>
-          <span><strong className="font-medium text-zinc-200">Comfort:</strong> {preferenceLevel("comfort", filters.comfort)}</span>
-          <span><strong className="font-medium text-zinc-200">Services:</strong> {preferenceLevel("supply_need", filters.supply_need)}</span>
-          <span><strong className="font-medium text-zinc-200">Stability:</strong> {preferenceLevel("risk_pri", filters.risk_pri)}</span>
+      <div className="border-y border-white/[0.08] py-4" aria-label="Active ranking preferences">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-500">
+          <span><strong className="font-medium text-zinc-300">Reference</strong> · {referenceLabel}</span>
+          <span><strong className="font-medium text-zinc-300">Value</strong> · {preferenceLevel("budget_sens", filters.budget_sens)}</span>
+          <span><strong className="font-medium text-zinc-300">Comfort</strong> · {preferenceLevel("comfort", filters.comfort)}</span>
+          <span><strong className="font-medium text-zinc-300">Services</strong> · {preferenceLevel("supply_need", filters.supply_need)}</span>
+          <span><strong className="font-medium text-zinc-300">Stability</strong> · {preferenceLevel("risk_pri", filters.risk_pri)}</span>
         </div>
       </div>
 
@@ -103,8 +103,8 @@ function CountryDetailSkeleton() {
   return (
     <div className="space-y-8 pb-10" aria-live="polite" aria-busy="true" aria-label="Loading country detail">
       <span className="sr-only">Loading country detail…</span>
-      <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-8" aria-hidden="true"><Skeleton className="h-4 w-32 bg-white/10" /><Skeleton className="mt-6 h-12 w-64 bg-white/10" /><Skeleton className="mt-5 h-5 w-2/3 bg-white/10" /><div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-16 bg-white/10" />)}</div></div>
-      <div aria-hidden="true">{Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="mb-8 h-72 w-full rounded-2xl bg-white/5" />)}</div>
+      <div className="border-b border-white/[0.08] pb-8" aria-hidden="true"><Skeleton className="h-4 w-32 bg-white/10" /><Skeleton className="mt-6 h-12 w-64 bg-white/10" /><Skeleton className="mt-5 h-5 w-2/3 bg-white/10" /><div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-16 bg-white/10" />)}</div></div>
+      <div aria-hidden="true">{Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="mb-8 h-72 w-full rounded-xl bg-white/5" />)}</div>
     </div>
   );
 }
