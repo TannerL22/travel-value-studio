@@ -111,8 +111,8 @@ export function WorldMap({ results, onCountryClick, activeCountryKey = null, onC
 
   const keyboardOrder = useMemo(
     () => (mapPaths?.countries ?? [])
-      .filter((country): country is (typeof mapPaths.countries)[number] & { data: RankingRow } => Boolean(country.data))
-      .sort((a, b) => (a.data.rank ?? Number.POSITIVE_INFINITY) - (b.data.rank ?? Number.POSITIVE_INFINITY))
+      .filter((country) => Boolean(country.data))
+      .sort((a, b) => (a.data?.rank ?? Number.POSITIVE_INFINITY) - (b.data?.rank ?? Number.POSITIVE_INFINITY))
       .map((country) => country.key),
     [mapPaths],
   );
