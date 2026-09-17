@@ -9,6 +9,52 @@ export const DEFAULT_FILTERS: FilterState = {
   risk_pri: 0.75,
 };
 
+export type PreferenceKey = "budget_sens" | "comfort" | "supply_need" | "risk_pri";
+
+export type PreferenceDefinition = {
+  key: PreferenceKey;
+  label: string;
+  shortLabel: string;
+  description: string;
+  lowLabel: string;
+  highLabel: string;
+};
+
+export const PREFERENCE_DEFINITIONS: PreferenceDefinition[] = [
+  {
+    key: "budget_sens",
+    label: "Maximize purchasing power",
+    shortLabel: "Value",
+    description: "How strongly should cheap local prices influence the ranking? Higher settings make origin-relative purchasing power more decisive.",
+    lowLabel: "Balanced",
+    highLabel: "Maximum value",
+  },
+  {
+    key: "comfort",
+    label: "Basic living standards",
+    shortLabel: "Comfort",
+    description: "How strongly should destinations be penalized when water, sanitation, electricity, internet or health-service access falls below a modern baseline?",
+    lowLabel: "Flexible",
+    highLabel: "Very important",
+  },
+  {
+    key: "supply_need",
+    label: "Established services",
+    shortLabel: "Services",
+    description: "How strongly should the ranking penalize destinations with thin accommodation and visitor-service supply?",
+    lowLabel: "Flexible",
+    highLabel: "Very important",
+  },
+  {
+    key: "risk_pri",
+    label: "Political stability",
+    shortLabel: "Stability",
+    description: "How strongly should lower political stability reduce a destination's ranking? This is not a complete traveller crime or personal-safety measure.",
+    lowLabel: "Ignore",
+    highLabel: "Very important",
+  },
+];
+
 const clamp01 = (value: number, fallback: number) => {
   if (!Number.isFinite(value)) return fallback;
   return Math.min(1, Math.max(0, value));
@@ -20,6 +66,42 @@ const readNumber = (params: URLSearchParams, key: string, fallback: number) => {
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
+
+export function preferenceLevel(key: PreferenceKey, value: number): string {
+  const normalized = clamp01(value, 0);
+
+  if (key === "risk_pri") {
+    if (normalized <= 0.1) return "Ignore";
+    if (normalized <= 0.35) return "Low";
+    if (normalized <= 0.6) return "Balanced";
+    if (normalized <= 0.85) return "High";
+    return "Very high";
+  }
+
+  if (key === "comfort" || key === "supply_need") {
+    if (normalized <= 0.15) return "Flexible";
+    if (normalized <= 0.4) return "Low";
+    if (normalized <= 0.65) return "Balanced";
+    if (normalized <= 0.85) return "High";
+    return "Very high";
+  }
+
+  if (normalized <= 0.2) return "Low";
+  if (normalized <= 0.45) return "Balanced";
+  if (normalized <= 0.7) return "High";
+  if (normalized <= 0.9) return "Very high";
+  return "Maximum";
+}
+
+export function resetPreferenceValues(filters: FilterState): FilterState {
+  return {
+    ...filters,
+    budget_sens: DEFAULT_FILTERS.budget_sens,
+    comfort: DEFAULT_FILTERS.comfort,
+    supply_need: DEFAULT_FILTERS.supply_need,
+    risk_pri: DEFAULT_FILTERS.risk_pri,
+  };
+}
 
 export function parsePreferences(params: URLSearchParams): FilterState {
   const yearRaw = Math.round(readNumber(params, "year", DEFAULT_FILTERS.year));
