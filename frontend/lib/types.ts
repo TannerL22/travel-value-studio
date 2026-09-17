@@ -24,13 +24,17 @@ export type RankingRow = {
   structural_purchasing_power?: number | null;
   purchasing_power_advantage_pct?: number | null;
   structural_value_factor?: number | null;
+  score_pre_fx_opportunity?: number | null;
   fx_opportunity?: number | null;
   fx_opportunity_multiplier?: number | null;
   basic_comfort?: number | null;
+  basic_comfort_coverage?: number | null;
   basic_comfort_penalty?: number | null;
   service_depth?: number | null;
+  service_depth_coverage?: number | null;
   service_depth_penalty?: number | null;
   stability?: number | null;
+  stability_evidence_coverage?: number | null;
   stability_penalty?: number | null;
   quality_adjusted_value?: number | null;
   score_infra?: number | null;
