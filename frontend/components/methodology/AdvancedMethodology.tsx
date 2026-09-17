@@ -13,7 +13,7 @@ export function AdvancedMethodology({ methodology, sourceRegistry }: { methodolo
   const components = useMemo(() => {
     const source = methodology.phase_7_components ?? {};
     const ordered = METHODOLOGY_COMPONENT_ORDER.map((key) => [key, source[key]] as const).filter(([, value]) => Boolean(value));
-    const orderedKeys = new Set(ordered.map(([key]) => key));
+    const orderedKeys = new Set<string>(ordered.map(([key]) => key));
     const remaining = Object.entries(source).filter(([key]) => !orderedKeys.has(key));
     return [...ordered, ...remaining];
   }, [methodology.phase_7_components]);
@@ -21,7 +21,7 @@ export function AdvancedMethodology({ methodology, sourceRegistry }: { methodolo
   const sourceFields = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const fields = Object.values(sourceRegistry);
-    const priorityIndex = new Map(SOURCE_PRIORITY_FIELDS.map((field, index) => [field, index]));
+    const priorityIndex = new Map<string, number>(SOURCE_PRIORITY_FIELDS.map((field, index) => [field, index]));
     const ordered = [...fields].sort((a, b) => {
       const ai = priorityIndex.get(a.field_name) ?? Number.POSITIVE_INFINITY;
       const bi = priorityIndex.get(b.field_name) ?? Number.POSITIVE_INFINITY;
