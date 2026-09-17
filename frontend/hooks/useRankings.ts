@@ -16,8 +16,12 @@ export function useRankings(filters: FilterState, enabled = true) {
     if (!enabled) return;
     const controller = new AbortController();
     let active = true;
-    setLoading(true);
-    setError(null);
+
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      setLoading(true);
+      setError(null);
+    });
 
     fetchRankings(debouncedFilters, controller.signal)
       .then((data) => {
