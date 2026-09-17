@@ -26,6 +26,20 @@ def test_missing_stability_is_not_penalized() -> None:
     assert r7.stability_penalty(10.0, 1.0, 0.0) == 1.0
 
 
+def test_partial_proxy_penalties_have_explicit_floors() -> None:
+    assert abs(r7.service_depth_penalty(0.0, 1.0, 1.0) - (1.0 - r7.SERVICE_MAX_HAIRCUT)) < 1e-12
+    assert abs(r7.stability_penalty(0.0, 1.0, 1.0) - (1.0 - r7.STABILITY_MAX_HAIRCUT)) < 1e-12
+    assert r7.service_depth_penalty(100.0, 1.0, 1.0) == 1.0
+    assert r7.stability_penalty(100.0, 1.0, 1.0) == 1.0
+
+
+def test_service_and_stability_are_meaningful_but_not_single_factor_vetoes() -> None:
+    weak_service = r7.service_depth_penalty(20.0, 0.65, 0.9)
+    weak_stability = r7.stability_penalty(36.0, 0.75, 1.0)
+    assert 0.75 < weak_service < 1.0
+    assert 0.75 < weak_stability < 1.0
+
+
 def test_comfort_and_service_can_change_order() -> None:
     frame = pd.DataFrame(
         [
@@ -146,6 +160,8 @@ def main() -> None:
     test_structural_pp_is_monotonic_and_saturates()
     test_stability_priority_zero_is_exactly_neutral()
     test_missing_stability_is_not_penalized()
+    test_partial_proxy_penalties_have_explicit_floors()
+    test_service_and_stability_are_meaningful_but_not_single_factor_vetoes()
     test_comfort_and_service_can_change_order()
     test_legacy_gdp_or_score_cannot_drive_phase7_order()
     test_cheapness_priority_changes_elasticity_not_direction()
