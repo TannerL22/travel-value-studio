@@ -17,7 +17,7 @@ jobs:
       - name: Install backend dependencies
         run: pip install -r backend/requirements.txt
       - name: Compile backend
-        run: python -m py_compile backend/main.py backend/data_sources.py backend/source_registry.py backend/model_contract.py backend/fx_opportunity.py backend/phase2_registry.py backend/basic_comfort.py backend/phase3_registry.py backend/service_depth.py backend/phase4_registry.py backend/city_intelligence.py backend/phase5_registry.py
+        run: python -m py_compile backend/main.py backend/data_sources.py backend/source_registry.py backend/model_contract.py backend/fx_opportunity.py backend/phase2_registry.py backend/basic_comfort.py backend/phase3_registry.py backend/service_depth.py backend/phase4_registry.py backend/city_intelligence.py backend/phase5_registry.py backend/mobility_digital.py backend/phase6_registry.py
       - name: Run backend sanity checks
         run: python backend/sanity_checks.py
       - name: Run Phase 2 FX checks
@@ -28,6 +28,8 @@ jobs:
         run: python backend/service_depth_checks.py
       - name: Run Phase 5 city intelligence checks
         run: python backend/city_intelligence_checks.py
+      - name: Run Phase 6 mobility and digital checks
+        run: python backend/mobility_digital_checks.py
 
   frontend:
     runs-on: ubuntu-latest
