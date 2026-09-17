@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { ArrowRight, BookOpen, Globe, LayoutGrid, Plus, X } from "lucide-react";
 
-import { DestinationCard } from "@/components/DestinationCard";
+import { DestinationResult } from "@/components/discover/DestinationResult";
 import { DestinationModal } from "@/components/DestinationModal";
 import { MethodologyPanel } from "@/components/MethodologyPanel";
 import { PreferenceBar } from "@/components/preferences/PreferenceBar";
@@ -73,27 +73,22 @@ export default function Home() {
   }, [rankingsError]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    const names = results.map((row) => row.country ?? row.iso3 ?? "").filter((name) => name && !imageMap[name]);
-    if (names.length === 0) return () => controller.abort();
+    if (!selectedCountry) return;
+    const name = selectedCountry.country ?? selectedCountry.iso3 ?? "";
+    if (!name || imageMap[name]) return;
 
-    const fetchImages = async () => {
-      const updates: Record<string, string> = {};
-      for (const name of names) {
-        try {
-          const response = await fetch(`/api/pexels?q=${encodeURIComponent(name)}%20travel`, { signal: controller.signal });
-          if (!response.ok) continue;
-          const data = (await response.json()) as { url?: string };
-          if (data.url) updates[name] = data.url;
-        } catch (error) {
-          if ((error as { name?: string }).name === "AbortError") break;
-        }
-      }
-      if (Object.keys(updates).length > 0) setImageMap((prev) => ({ ...prev, ...updates }));
-    };
-    void fetchImages();
+    const controller = new AbortController();
+    fetch(`/api/pexels?q=${encodeURIComponent(name)}%20travel`, { signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { url?: string } | null) => {
+        if (data?.url) setImageMap((previous) => ({ ...previous, [name]: data.url as string }));
+      })
+      .catch((error: unknown) => {
+        if ((error as { name?: string })?.name !== "AbortError") return;
+      });
+
     return () => controller.abort();
-  }, [results, imageMap]);
+  }, [selectedCountry, imageMap]);
 
   const toggleCompare = (country: RankingRow) => {
     const key = countryKey(country);
@@ -106,19 +101,6 @@ export default function Home() {
       }
       return [...prev, country];
     });
-  };
-
-  const scoreValues = useMemo(
-    () => results.map((r) => r.quality_adjusted_value ?? r.Score ?? r.score ?? null).filter((v): v is number => typeof v === "number" && Number.isFinite(v)).sort((a, b) => a - b),
-    [results]
-  );
-
-  const scorePercentile = (value: number | null) => {
-    if (value == null || scoreValues.length === 0) return null;
-    if (scoreValues.length === 1) return 1;
-    const idx = scoreValues.findIndex((v) => v >= value);
-    const resolved = idx === -1 ? scoreValues.length - 1 : idx;
-    return resolved / (scoreValues.length - 1);
   };
 
   const sortedResults = useMemo(() => {
@@ -141,7 +123,7 @@ export default function Home() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">Global Rankings</p>
           <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Where Your Money Buys More Life</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
-            Broad purchasing power adjusted by current comfort, service-depth, and stability evidence. Destination costs only; travel-to-destination costs are outside scope.
+            Compare origin-relative purchasing power with the living-standard, service, stability and current FX effects that shape the final ranking.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -150,7 +132,7 @@ export default function Home() {
           </Button>
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "map")} className="rounded-lg border border-white/10 bg-zinc-950/60 p-1">
             <TabsList className="h-8 bg-transparent">
-              <TabsTrigger value="grid" className="h-full gap-2 px-3 text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-white/10 data-[state=active]:text-white"><LayoutGrid className="h-3.5 w-3.5" /> Grid</TabsTrigger>
+              <TabsTrigger value="grid" className="h-full gap-2 px-3 text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-white/10 data-[state=active]:text-white"><LayoutGrid className="h-3.5 w-3.5" /> Results</TabsTrigger>
               <TabsTrigger value="map" className="h-full gap-2 px-3 text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-white/10 data-[state=active]:text-white"><Globe className="h-3.5 w-3.5" /> Map</TabsTrigger>
             </TabsList>
           </Tabs>
@@ -171,48 +153,26 @@ export default function Home() {
 
       <AnimatePresence mode="wait">
         {viewMode === "grid" ? (
-          <motion.div key="grid" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          <motion.div key="grid" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {loading
-              ? Array.from({ length: 8 }).map((_, index) => (
-                  <div key={`skeleton-${index}`} className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
-                    <Skeleton className="aspect-[4/3] w-full bg-white/10" />
-                    <div className="space-y-2 p-4"><Skeleton className="h-4 w-2/3 bg-white/10" /><Skeleton className="h-3 w-1/3 bg-white/10" /></div>
+              ? Array.from({ length: 9 }).map((_, index) => (
+                  <div key={`skeleton-${index}`} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-2"><Skeleton className="h-3 w-8 bg-white/10" /><Skeleton className="h-6 w-32 bg-white/10" /></div>
+                      <Skeleton className="h-9 w-12 bg-white/10" />
+                    </div>
+                    <div className="mt-5 grid grid-cols-2 gap-3 border-y border-white/10 py-4"><Skeleton className="h-9 bg-white/10" /><Skeleton className="h-9 bg-white/10" /></div>
+                    <Skeleton className="mt-5 h-16 w-full bg-white/10" />
                   </div>
                 ))
-              : sortedResults.map((row, index) => {
-                  const name = row.country ?? row.iso3 ?? "Unknown";
-                  const valueScore = row.quality_adjusted_value ?? row.Score ?? row.score ?? null;
-                  const pp = row.structural_purchasing_power ?? row.value_multiplier_relative ?? null;
-                  const service = (row.service_depth ?? row.component_tourism_depth ?? 0) / 100;
-                  const stability = (row.stability ?? row.component_safety_stability ?? 0) / 100;
-                  const qualityScore = Math.max(0, Math.min(1, (service + stability) / 2));
-                  const starRating = Math.max(1, Math.min(5, Math.round(qualityScore * 10) / 2));
-                  const qualityLabel = starRating >= 4.5 ? "High usability" : starRating >= 3.5 ? "Good usability" : starRating >= 2.5 ? "Mixed usability" : "Thin usability";
-                  const scorePercent = scorePercentile(valueScore);
-                  const topPercent = scorePercent != null ? Math.max(1, Math.round((1 - scorePercent) * 100)) : null;
-                  const verdict = pp == null ? "Value unclear" : pp >= 2 && qualityScore >= 0.65 ? "Strong Arbitrage" : pp >= 1.5 ? "High Purchasing Power" : valueScore != null && valueScore >= 70 ? "Quality Value" : "Mixed Value";
-
-                  return (
-                    <DestinationCard
-                      key={`${name}-${index}`}
-                      country={{
-                        name,
-                        valueTopPercent: topPercent,
-                        valueTitle: "Quality-adjusted value percentile",
-                        verdict,
-                        starRating,
-                        qualityLabel,
-                        imageUrl: imageMap[name],
-                        stability,
-                        serviceDepth: service,
-                        arrivals: row.intl_arrivals,
-                        purchasingPower: pp,
-                      }}
-                      index={index}
-                      onClick={() => setSelectedCountry(row)}
-                    />
-                  );
-                })}
+              : sortedResults.map((row, index) => (
+                  <DestinationResult
+                    key={countryKey(row)}
+                    country={row}
+                    index={index}
+                    onClick={() => setSelectedCountry(row)}
+                  />
+                ))}
           </motion.div>
         ) : (
           <motion.div key="map" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="w-full">
@@ -243,7 +203,7 @@ export default function Home() {
                     <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/10 text-[10px] font-bold text-white sm:h-10 sm:w-10">
                       {imageMap[c.country ?? c.iso3 ?? ""] ? <div className="h-full w-full bg-cover bg-center" style={{ backgroundImage: `url(${imageMap[c.country ?? c.iso3 ?? ""]})` }} /> : c.iso3?.slice(0, 2)}
                     </div>
-                    <button onClick={() => toggleCompare(c)} className="absolute -right-1 -top-1 rounded-full border border-white/10 bg-zinc-950 p-0.5 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"><X className="h-2.5 w-2.5" /></button>
+                    <button onClick={() => toggleCompare(c)} className="absolute -right-1 -top-1 rounded-full border border-white/10 bg-zinc-950 p-0.5 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100" aria-label={`Remove ${c.country ?? c.iso3 ?? "country"} from comparison`}><X className="h-2.5 w-2.5" /></button>
                   </div>
                 ))}
                 {Array.from({ length: 3 - compareList.length }).map((_, i) => <div key={i} className="hidden h-10 w-10 items-center justify-center rounded-full border border-dashed border-white/10 text-zinc-600 sm:flex"><Plus className="h-4 w-4" /></div>)}
