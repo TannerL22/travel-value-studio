@@ -9,7 +9,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Travel Value Studio",
-  description: "Compare destination value, cost, safety, and tourism depth from global economic data.",
+  description: "Discover where your currency currently buys the most usable quality of life, then compare country value with city usability.",
 };
 
 export default function RootLayout({
