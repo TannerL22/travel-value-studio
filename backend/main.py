@@ -18,7 +18,12 @@ from data_sources import (
     promote_origin_fx_tailwind_component,
     resolve_origin_context,
 )
-from model_contract import phase_1_methodology
+from fx_opportunity import (
+    FX_MAX_RANKING_EFFECT,
+    add_fx_opportunity_v2,
+    apply_fx_opportunity_to_ranking,
+)
+from model_contract import phase_2_methodology
 from source_registry import get_methodology_summary, get_source_registry
 
 
@@ -111,7 +116,7 @@ def get_api_source_registry() -> Any:
 
 @app.get("/api/methodology")
 def get_api_methodology() -> Any:
-    return phase_1_methodology(get_methodology_summary())
+    return phase_2_methodology(get_methodology_summary())
 
 
 @app.post("/api/rankings")
@@ -119,9 +124,6 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     df_raw, meta = _get_cached_dataset(target_year=query.year)
     origin_context = resolve_origin_context(df_raw, query.origin_iso3)
 
-    # Phase 1 preserves the production ranking formula while renaming its outputs
-    # to match what the data actually measures. Later phases will rebuild the
-    # component inputs and make origin-aware FX directly affect ranking.
     alpha = 1.0 + 2.2 * query.budget_sens
     ppp_floor = 3000 + 17000 * query.comfort
     floor_strength = 1.0 + 2.0 * query.comfort
@@ -132,6 +134,8 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
         np.clip(0.2 + 0.9 * query.budget_sens + 0.2 * query.comfort, 0.0, 1.5)
     )
 
+    # Structural value model. Phase 2 leaves these underlying components intact
+    # and adds a bounded bilateral FX timing layer after the base score is built.
     scored = compute_scores(
         df_raw,
         nominal_penalty_exp=float(alpha),
@@ -146,20 +150,24 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
 
     origin_pp = origin_context["origin_pp_multiplier"]
     origin_currency = origin_context["origin_currency"]
+
+    # Keep the legacy 1Y/3Y diagnostics as a fallback and for validation history.
     scored = add_origin_fx_tailwind_diagnostics(scored, origin_currency)
     scored = promote_origin_fx_tailwind_component(scored)
 
+    # Phase 2: 1W / 1M / 3M / 1Y / 3Y bilateral FX timing. The ranking effect
+    # is capped so a currency shock can matter without overwhelming structural
+    # purchasing power and the user's quality preferences.
+    scored = add_fx_opportunity_v2(scored, origin_currency)
+    scored = apply_fx_opportunity_to_ranking(scored)
+
     # Broad purchasing power in the destination relative to the selected origin.
-    # This is an index, not an estimate of a personal or tourist daily budget.
     scored["value_multiplier_relative"] = scored["tourism_pp_power"] / origin_pp
     scored["structural_purchasing_power"] = scored["value_multiplier_relative"]
     scored["purchasing_power_advantage_pct"] = (
         scored["structural_purchasing_power"] - 1.0
     ) * 100.0
 
-    # Phase 1 semantic aliases. Legacy component columns are retained so
-    # historical validation snapshots and downstream analysis remain readable.
-    scored["fx_opportunity"] = scored["component_fx_tailwind"]
     scored["basic_comfort"] = scored["component_comfort_floor"]
     scored["service_depth"] = scored["component_tourism_depth"]
     scored["stability"] = scored["component_safety_stability"]
@@ -176,8 +184,10 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     meta["origin_fallback_used"] = origin_context["origin_fallback_used"]
     meta["origin_pp_multiplier"] = float(origin_context["origin_pp_multiplier"])
     meta["origin_currency"] = origin_currency
-    meta["model_contract"] = "phase_1_quality_adjusted_purchasing_power"
+    meta["model_contract"] = "phase_2_quality_adjusted_purchasing_power_fx_v2"
     meta["daily_cost_estimate_removed"] = True
+    meta["fx_opportunity_horizons"] = ["1w", "1m", "3m", "1y", "3y"]
+    meta["fx_opportunity_max_ranking_effect"] = FX_MAX_RANKING_EFFECT
 
     if include_meta:
         return {"meta": meta, "results": results}
