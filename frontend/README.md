@@ -4,7 +4,7 @@ Next.js application for Travel Value Studio.
 
 ## Frontend v2 status
 
-**Phase 3 — Ranked Destination Results: implemented.**
+**Phase 4 — Integrated Discovery Map: implemented.**
 
 The frontend is being rebuilt around a product architecture rather than the original model-debugging dashboard.
 
@@ -75,6 +75,25 @@ Each result exposes the backend value rank, Quality-Adjusted Value score, origin
 It then identifies the largest observed tailwind and drag for explanatory display only. The backend remains the sole source of ranking order and score.
 
 Country imagery is no longer fetched for the entire ranking list. While the compatibility country modal remains in use, Pexels is requested only when a user opens a destination. Phase 5 will replace that modal with the full country-detail route.
+
+### Phase 4 integrated discovery map
+
+Desktop Discover now uses a persistent two-column discovery surface rather than separate Results / Map tabs:
+
+```text
+components/discover/
+  RankingList.tsx
+  DestinationResult.tsx
+
+components/
+  WorldMap.tsx
+```
+
+The map occupies the larger side of the desktop layout and remains visible while the ranked destination list scrolls independently. Hovering or keyboard-focusing a result highlights the same country on the map; hovering or focusing a map country highlights the matching result. Both sides use the same ISO3/country key and the backend's existing global value rank.
+
+`WorldMap.tsx` retains the local GeoJSON and Equal Earth projection, but now uses a calmer single-hue sequential Quality-Adjusted Value scale. Its tooltip exposes only production fields: global rank, value score, origin-relative purchasing power, and FX ranking effect. The map does not change meaning when the list is sorted by purchasing power or stability; map color always remains Quality-Adjusted Value.
+
+On smaller screens the ranking remains primary. A Map button opens a full-screen discovery overlay, with Escape/close handling and body-scroll locking. Selecting a country from that map opens the existing country-detail compatibility modal.
 
 ## Commands
 
