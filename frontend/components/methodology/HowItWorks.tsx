@@ -37,32 +37,32 @@ export function HowItWorks() {
   return (
     <section>
       <div className="max-w-3xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300/80">How it works</p>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">From foreign currency to a destination shortlist</h2>
+        <p className="text-sm font-medium text-cyan-300/80">How it works</p>
+        <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">From foreign currency to a destination shortlist</h2>
         <p className="mt-4 text-sm leading-7 text-zinc-400 sm:text-base">
           Travel Value Studio is not trying to find the cheapest country. It asks where your money buys unusually strong day-to-day living after accounting for minimum living standards, service depth, stability and current currency conditions.
         </p>
       </div>
 
-      <div className="mt-8 grid gap-3 lg:grid-cols-5">
+      <div className="mt-8 divide-y divide-white/[0.08] border-y border-white/[0.08] lg:grid lg:grid-cols-5 lg:divide-x lg:divide-y-0">
         {steps.map((step) => {
           const Icon = step.icon;
           return (
-            <article key={step.number} className="relative rounded-2xl border border-white/10 bg-white/[0.025] p-5">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[10px] font-semibold tracking-[0.16em] text-zinc-600">{step.number}</span>
-                <Icon className="h-4 w-4 text-cyan-300/80" />
+            <article key={step.number} className="py-5 lg:px-5 lg:first:pl-0 lg:last:pr-0">
+              <div className="flex items-center gap-2 text-zinc-500">
+                <span className="text-xs tabular-nums">{step.number}</span>
+                <Icon className="h-4 w-4 text-cyan-300/70" aria-hidden="true" />
               </div>
-              <h3 className="mt-5 text-base font-semibold leading-6 text-white">{step.title}</h3>
+              <h3 className="mt-4 text-base font-semibold leading-6 text-white">{step.title}</h3>
               <p className="mt-2 text-xs leading-5 text-zinc-500">{step.text}</p>
             </article>
           );
         })}
       </div>
 
-      <div className="mt-8 rounded-2xl border border-white/10 bg-zinc-950/45 p-5 sm:p-6">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Country scoring logic</p>
-        <div className="mt-4 overflow-x-auto">
+      <div className="mt-9 border-b border-white/[0.08] pb-7">
+        <p className="text-sm font-medium text-zinc-300">Country scoring logic</p>
+        <div className="mt-4 overflow-x-auto pb-1">
           <div className="flex min-w-[760px] items-center gap-2 text-sm">
             <FormulaTerm label="Structural value" note="Origin-relative purchasing power" />
             <Operator value="×" />
@@ -77,12 +77,12 @@ export function HowItWorks() {
             <FormulaTerm label="Value score" note="0–100 relative ranking" emphasize />
           </div>
         </div>
-        <p className="mt-4 max-w-4xl text-xs leading-5 text-zinc-600">
+        <p className="mt-4 max-w-4xl text-xs leading-5 text-zinc-500">
           A penalty of 1.00 is neutral; values below 1.00 reduce the score. Missing stability evidence is neutral rather than treated as poor performance, and Stability set to Ignore is exactly neutral. The final 0–100 value score is comparative within the current country universe, not an absolute quality-of-life rating.
         </p>
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
+      <div className="mt-6 grid gap-x-8 gap-y-5 md:grid-cols-3">
         <Principle title="No rich-country bonus" text="Comfort and service layers are designed as floors. Once a destination clears your requirement, additional wealth or infrastructure does not keep compounding the score." />
         <Principle title="Missing is not bad" text="Where practical, missing evidence reduces coverage or leaves an effect neutral instead of silently converting data gaps into poor performance." />
         <Principle title="Country first, city second" text="Country purchasing power is not mixed with city POI evidence. City intelligence is a separate drill-down after the country screen." />
@@ -93,9 +93,9 @@ export function HowItWorks() {
 
 function FormulaTerm({ label, note, emphasize = false }: { label: string; note: string; emphasize?: boolean }) {
   return (
-    <div className={`min-w-[118px] rounded-xl border px-3 py-3 ${emphasize ? "border-cyan-300/20 bg-cyan-300/[0.06]" : "border-white/10 bg-white/[0.025]"}`}>
+    <div className={`min-w-[118px] rounded-lg border px-3 py-3 ${emphasize ? "border-cyan-300/20 bg-cyan-300/[0.05]" : "border-white/[0.08] bg-white/[0.012]"}`}>
       <p className={`font-medium ${emphasize ? "text-cyan-100" : "text-zinc-200"}`}>{label}</p>
-      <p className="mt-1 text-[10px] leading-4 text-zinc-600">{note}</p>
+      <p className="mt-1 text-[10px] leading-4 text-zinc-500">{note}</p>
     </div>
   );
 }
@@ -106,9 +106,9 @@ function Operator({ value }: { value: string }) {
 
 function Principle({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-xl border border-white/[0.07] px-4 py-4">
+    <div>
       <p className="text-sm font-medium text-zinc-200">{title}</p>
-      <p className="mt-2 text-xs leading-5 text-zinc-600">{text}</p>
+      <p className="mt-2 text-xs leading-5 text-zinc-500">{text}</p>
     </div>
   );
 }
