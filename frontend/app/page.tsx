@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowRight, BookOpen, Map, Plus, X } from "lucide-react";
+import { BookOpen, Map, X } from "lucide-react";
 
 import { RankingList } from "@/components/discover/RankingList";
-import { DestinationModal } from "@/components/DestinationModal";
 import { MethodologyPanel } from "@/components/MethodologyPanel";
 import { PreferenceBar } from "@/components/preferences/PreferenceBar";
 import { PreferenceDrawer } from "@/components/preferences/PreferenceDrawer";
@@ -23,22 +23,14 @@ import type { FilterState, RankingRow } from "@/lib/types";
 
 const countryKey = (country: RankingRow) => (country.iso3 ?? country.country ?? "unknown").toUpperCase();
 
-const formatMetric = (value: number | null | undefined, suffix = "") => {
-  if (value == null || !Number.isFinite(value)) return "N/A";
-  return `${value.toFixed(2)}${suffix}`;
-};
-
 export default function Home() {
+  const router = useRouter();
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [urlHydrated, setUrlHydrated] = useState(false);
   const [sortBy, setSortBy] = useState<"value" | "purchasing_power" | "stability">("value");
-  const [imageMap, setImageMap] = useState<Record<string, string>>({});
-  const [compareList, setCompareList] = useState<RankingRow[]>([]);
-  const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false);
   const [isPreferenceOpen, setIsPreferenceOpen] = useState(false);
   const [isMobileMapOpen, setIsMobileMapOpen] = useState(false);
-  const [selectedCountry, setSelectedCountry] = useState<RankingRow | null>(null);
   const [hoveredCountryKey, setHoveredCountryKey] = useState<string | null>(null);
 
   const { origins, error: originsError } = useOrigins();
@@ -72,24 +64,6 @@ export default function Home() {
   }, [rankingsError]);
 
   useEffect(() => {
-    if (!selectedCountry) return;
-    const name = selectedCountry.country ?? selectedCountry.iso3 ?? "";
-    if (!name || imageMap[name]) return;
-
-    const controller = new AbortController();
-    fetch(`/api/pexels?q=${encodeURIComponent(name)}%20travel`, { signal: controller.signal })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: { url?: string } | null) => {
-        if (data?.url) setImageMap((previous) => ({ ...previous, [name]: data.url as string }));
-      })
-      .catch((error: unknown) => {
-        if ((error as { name?: string })?.name !== "AbortError") return;
-      });
-
-    return () => controller.abort();
-  }, [selectedCountry, imageMap]);
-
-  useEffect(() => {
     if (!isMobileMapOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -102,19 +76,6 @@ export default function Home() {
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [isMobileMapOpen]);
-
-  const toggleCompare = (country: RankingRow) => {
-    const key = countryKey(country);
-    if (compareList.some((c) => countryKey(c) === key) && compareList.length <= 2) setIsCompareOpen(false);
-    setCompareList((prev) => {
-      if (prev.some((c) => countryKey(c) === key)) return prev.filter((c) => countryKey(c) !== key);
-      if (prev.length >= 3) {
-        toast.error("You can compare up to 3 countries at once.");
-        return prev;
-      }
-      return [...prev, country];
-    });
-  };
 
   const sortedResults = useMemo(() => {
     const items = [...results];
@@ -131,9 +92,19 @@ export default function Home() {
     setHoveredCountryKey(country ? countryKey(country) : null);
   };
 
+  const openCountry = (country: RankingRow) => {
+    const code = country.iso3?.toUpperCase();
+    if (!code) {
+      toast.error("This destination does not have a country code for detail navigation.");
+      return;
+    }
+    const params = preferencesToSearchParams(filters).toString();
+    router.push(`/country/${code}?${params}`);
+  };
+
   const handleMobileMapSelect = (country: RankingRow) => {
     setIsMobileMapOpen(false);
-    setSelectedCountry(country);
+    openCountry(country);
   };
 
   return (
@@ -176,7 +147,7 @@ export default function Home() {
             results={results}
             activeCountryKey={hoveredCountryKey}
             onCountryHover={handleCountryHover}
-            onCountryClick={(country) => setSelectedCountry(country)}
+            onCountryClick={openCountry}
           />
           <div className="mt-3 flex items-center justify-between gap-4 px-1 text-xs text-zinc-600">
             <span>Map color always represents Quality-Adjusted Value.</span>
@@ -188,7 +159,7 @@ export default function Home() {
           <div className="mb-3 flex items-end justify-between gap-4 px-1">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Ranked destinations</p>
-              <p className="mt-1 text-sm text-zinc-400">Hover a result to locate it on the map.</p>
+              <p className="mt-1 text-sm text-zinc-400">Hover a result to locate it on the map. Select it for the full country analysis.</p>
             </div>
           </div>
           <div className="max-h-[calc(100vh-7rem)] overflow-y-auto pr-2 [scrollbar-color:#3f3f46_transparent] [scrollbar-width:thin]">
@@ -197,7 +168,7 @@ export default function Home() {
               loading={loading}
               activeCountryKey={hoveredCountryKey}
               onCountryHover={handleCountryHover}
-              onCountrySelect={setSelectedCountry}
+              onCountrySelect={openCountry}
               compact
               skeletonCount={6}
             />
@@ -211,7 +182,7 @@ export default function Home() {
           loading={loading}
           activeCountryKey={hoveredCountryKey}
           onCountryHover={handleCountryHover}
-          onCountrySelect={setSelectedCountry}
+          onCountrySelect={openCountry}
           skeletonCount={7}
         />
       </section>
@@ -241,49 +212,9 @@ export default function Home() {
                 onCountryClick={handleMobileMapSelect}
               />
             </div>
-            <div className="border-t border-white/10 px-4 py-3 text-center text-xs text-zinc-500">Select a country to inspect its value drivers.</div>
+            <div className="border-t border-white/10 px-4 py-3 text-center text-xs text-zinc-500">Select a country to open its full value analysis.</div>
           </motion.div>
         ) : null}
-      </AnimatePresence>
-
-      {selectedCountry ? (
-        <DestinationModal
-          country={selectedCountry}
-          isOpen
-          onClose={() => setSelectedCountry(null)}
-          allResults={results}
-          imageUrl={imageMap[selectedCountry.country ?? selectedCountry.iso3 ?? ""]}
-          onCompare={toggleCompare}
-          isComparing={compareList.some((c) => countryKey(c) === countryKey(selectedCountry))}
-        />
-      ) : null}
-
-      <AnimatePresence>
-        {compareList.length > 0 ? (
-          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="fixed bottom-4 left-1/2 z-40 w-[calc(100%-2rem)] max-w-max -translate-x-1/2 sm:bottom-6 sm:w-auto">
-            <div className="flex items-center justify-between gap-3 rounded-full border border-white/10 bg-zinc-900/90 px-4 py-3 shadow-2xl backdrop-blur-xl sm:gap-6 sm:px-6">
-              <div className="flex items-center gap-2 sm:gap-3">
-                {compareList.map((c) => (
-                  <div key={countryKey(c)} className="group relative">
-                    <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/10 text-[10px] font-bold text-white sm:h-10 sm:w-10">
-                      {imageMap[c.country ?? c.iso3 ?? ""] ? <div className="h-full w-full bg-cover bg-center" style={{ backgroundImage: `url(${imageMap[c.country ?? c.iso3 ?? ""]})` }} /> : c.iso3?.slice(0, 2)}
-                    </div>
-                    <button onClick={() => toggleCompare(c)} className="absolute -right-1 -top-1 rounded-full border border-white/10 bg-zinc-950 p-0.5 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100" aria-label={`Remove ${c.country ?? c.iso3 ?? "country"} from comparison`}><X className="h-2.5 w-2.5" /></button>
-                  </div>
-                ))}
-                {Array.from({ length: 3 - compareList.length }).map((_, i) => <div key={i} className="hidden h-10 w-10 items-center justify-center rounded-full border border-dashed border-white/10 text-zinc-600 sm:flex"><Plus className="h-4 w-4" /></div>)}
-              </div>
-              <div className="hidden h-8 w-px bg-white/10 sm:block" />
-              <Button className="h-9 gap-2 rounded-full bg-emerald-500 px-4 text-white hover:bg-emerald-600 sm:h-10 sm:px-6" disabled={compareList.length < 2} onClick={() => setIsCompareOpen(true)}>
-                Compare <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {isCompareOpen && compareList.length >= 2 ? <ComparisonPanel countries={compareList} imageMap={imageMap} onClose={() => setIsCompareOpen(false)} onRemove={toggleCompare} /> : null}
       </AnimatePresence>
 
       <PreferenceDrawer
@@ -296,58 +227,5 @@ export default function Home() {
 
       <MethodologyPanel apiUrl={apiUrl} isOpen={isMethodologyOpen} onClose={() => setIsMethodologyOpen(false)} />
     </AppShell>
-  );
-}
-
-type ComparisonPanelProps = {
-  countries: RankingRow[];
-  imageMap: Record<string, string>;
-  onClose: () => void;
-  onRemove: (country: RankingRow) => void;
-};
-
-function ComparisonPanel({ countries, imageMap, onClose, onRemove }: ComparisonPanelProps) {
-  const metricRows = [
-    { label: "Quality-adjusted value", getValue: (c: RankingRow) => Math.round(c.quality_adjusted_value ?? c.Score ?? c.score ?? 0).toString() },
-    { label: "Purchasing power", getValue: (c: RankingRow) => formatMetric(c.structural_purchasing_power ?? c.value_multiplier_relative, "x") },
-    { label: "FX opportunity", getValue: (c: RankingRow) => c.fx_opportunity != null ? Math.round(c.fx_opportunity).toString() : "N/A" },
-    { label: "Basic comfort", getValue: (c: RankingRow) => c.basic_comfort != null ? Math.round(c.basic_comfort).toString() : "N/A" },
-    { label: "Service depth", getValue: (c: RankingRow) => c.service_depth != null ? Math.round(c.service_depth).toString() : "N/A" },
-    { label: "Stability", getValue: (c: RankingRow) => c.stability != null ? Math.round(c.stability).toString() : "N/A" },
-  ];
-
-  return (
-    <motion.div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/70 p-3 backdrop-blur-sm sm:items-center sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
-      <motion.div className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl" initial={{ y: 32, scale: 0.98 }} animate={{ y: 0, scale: 1 }} exit={{ y: 32, scale: 0.98 }} onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-white/10 px-4 py-4 sm:px-6 sm:py-5">
-          <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Comparison</p><h2 className="mt-1 text-lg font-semibold text-white sm:text-xl">Purchasing-power tradeoffs</h2></div>
-          <button type="button" onClick={onClose} className="rounded-full border border-white/10 bg-white/5 p-2 text-zinc-300" aria-label="Close comparison"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="min-w-[680px]">
-          <div className="grid" style={{ gridTemplateColumns: `minmax(9rem, 0.8fr) repeat(${countries.length}, minmax(0, 1fr))` }}>
-            <div className="border-b border-white/10 bg-zinc-950/60 p-4 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Metric</div>
-            {countries.map((country) => {
-              const name = country.country ?? country.iso3 ?? "Unknown";
-              const imageUrl = imageMap[name];
-              return (
-                <div key={countryKey(country)} className="relative border-b border-l border-white/10 bg-zinc-950/40 p-4">
-                  <button type="button" onClick={() => onRemove(country)} className="absolute right-3 top-3 rounded-full bg-zinc-950/80 p-1 text-zinc-400" aria-label={`Remove ${name} from comparison`}><X className="h-3.5 w-3.5" /></button>
-                  <div className="flex items-center gap-3 pr-8">
-                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/5">{imageUrl ? <div className="h-full w-full bg-cover bg-center" style={{ backgroundImage: `url(${imageUrl})` }} /> : null}</div>
-                    <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{name}</p><p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-zinc-500">{country.iso3 ?? "N/A"}</p></div>
-                  </div>
-                </div>
-              );
-            })}
-            {metricRows.map((row) => (
-              <div className="contents" key={row.label}>
-                <div className="border-b border-white/10 bg-zinc-950/50 p-4 text-xs uppercase tracking-[0.16em] text-zinc-500">{row.label}</div>
-                {countries.map((country) => <div key={`${row.label}-${countryKey(country)}`} className="border-b border-l border-white/10 p-4 text-sm font-medium text-zinc-100">{row.getValue(country)}</div>)}
-              </div>
-            ))}
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
   );
 }
