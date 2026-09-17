@@ -17,7 +17,7 @@ from fx_opportunity import FX_MAX_RANKING_EFFECT
 from mobility_digital import enrich_cities_phase6
 from model_contract import phase_7_methodology
 from phase7_registry import get_phase7_source_registry
-from production_ranking import prepare_country_evidence, rank_prepared_countries
+from production_ranking import prepare_country_evidence, prepare_country_identity, rank_prepared_countries
 from ranking_v7 import add_city_usability_v7
 from source_registry import get_methodology_summary
 
@@ -90,7 +90,14 @@ def _get_cached_dataset(target_year: int) -> Tuple[pd.DataFrame, Dict[str, Any]]
 @app.get("/api/origins")
 def get_origins() -> Any:
     df_raw, _ = _get_cached_dataset(target_year=2025)
-    valid = df_raw[df_raw["iso3"].notna() & df_raw["country"].notna()].copy()
+    identity = prepare_country_identity(df_raw, target_year=2025)
+    pp = pd.to_numeric(identity.get("tourism_pp_power"), errors="coerce")
+    valid = identity[
+        identity["iso3"].notna()
+        & identity["country"].notna()
+        & pp.gt(0)
+        & identity["currency"].notna()
+    ].copy()
     valid = valid.sort_values("country")
 
     origins = []
@@ -98,8 +105,8 @@ def get_origins() -> Any:
         origins.append({
             "name": row["country"],
             "code": row["iso3"],
-            "pp_multiplier": float(row["tourism_pp_power"]) if pd.notna(row["tourism_pp_power"]) else 1.0,
-            "currency": row.get("currency", "USD"),
+            "pp_multiplier": float(row["tourism_pp_power"]),
+            "currency": row["currency"],
         })
     return origins
 
@@ -151,12 +158,13 @@ def get_cities(
 @app.post("/api/rankings")
 def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     df_raw, meta = _get_cached_dataset(target_year=query.year)
-    origin_context = resolve_origin_context(df_raw, query.origin_iso3)
 
-    # Phase 7.1 starts from the raw country universe. Objective evidence layers are
-    # added without filtering. The legacy GDP-led scorer runs only on a separate copy
-    # inside prepare_country_evidence and is left-joined back as prefixed audit data.
+    # Phase 7.1 starts from the raw World Bank/IMF dataset, removes non-country
+    # aggregate rows, repairs current country identity/WGI evidence, and adds the
+    # objective evidence layers. Legacy GDP scoring runs only on a separate copy and
+    # is left-joined back as explicitly prefixed audit data.
     prepared = prepare_country_evidence(df_raw, target_year=query.year)
+    origin_context = resolve_origin_context(prepared, query.origin_iso3)
     origin_pp = origin_context["origin_pp_multiplier"]
     origin_currency = origin_context["origin_currency"]
 
@@ -191,8 +199,8 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     meta["daily_cost_estimate_removed"] = True
     meta["phase7_legacy_gdp_score_drives_ranking"] = False
     meta["phase71_legacy_score_gates_country_universe"] = False
-    meta["phase71_raw_country_count"] = int(len(df_raw))
-    meta["phase71_prepared_country_count"] = int(len(prepared))
+    meta["phase71_raw_row_count_including_aggregates"] = int(len(df_raw))
+    meta["phase71_production_country_count"] = int(len(prepared))
     meta["phase71_legacy_scored_country_count"] = int(legacy_available.sum())
     meta["phase71_ranked_country_count"] = int(len(scored))
     meta["phase71_ranked_without_legacy_score_count"] = int((~ranked_without_legacy).sum())
