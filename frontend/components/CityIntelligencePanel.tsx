@@ -57,14 +57,17 @@ export function CityIntelligencePanel({ iso3 }: CityIntelligencePanelProps) {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (!iso3) {
+    if (!iso3) return;
+    const controller = new AbortController();
+
+    void Promise.resolve().then(() => {
+      if (controller.signal.aborted) return;
+      setLoading(true);
+      setFailed(false);
       setCities([]);
       setMeta(null);
-      return;
-    }
-    const controller = new AbortController();
-    setLoading(true);
-    setFailed(false);
+    });
+
     fetch(`${API_BASE_URL}/api/cities/${encodeURIComponent(iso3)}?limit=6&include_amenities=1`, { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error("City intelligence request failed");
@@ -82,6 +85,8 @@ export function CityIntelligencePanel({ iso3 }: CityIntelligencePanelProps) {
       });
     return () => controller.abort();
   }, [iso3]);
+
+  if (!iso3) return null;
 
   const categoryRows = (city: CityRow) => [
     ["Food", city.amenity_food_drink_score],
