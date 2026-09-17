@@ -24,7 +24,8 @@ from fx_opportunity import (
     apply_fx_opportunity_to_ranking,
 )
 from model_contract import phase_2_methodology
-from source_registry import get_methodology_summary, get_source_registry
+from phase2_registry import get_phase2_source_registry
+from source_registry import get_methodology_summary
 
 
 class RankingQuery(BaseModel):
@@ -111,7 +112,7 @@ def get_origins() -> Any:
 
 @app.get("/api/source-registry")
 def get_api_source_registry() -> Any:
-    return get_source_registry()
+    return get_phase2_source_registry()
 
 
 @app.get("/api/methodology")
@@ -134,8 +135,6 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
         np.clip(0.2 + 0.9 * query.budget_sens + 0.2 * query.comfort, 0.0, 1.5)
     )
 
-    # Structural value model. Phase 2 leaves these underlying components intact
-    # and adds a bounded bilateral FX timing layer after the base score is built.
     scored = compute_scores(
         df_raw,
         nominal_penalty_exp=float(alpha),
@@ -151,17 +150,15 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     origin_pp = origin_context["origin_pp_multiplier"]
     origin_currency = origin_context["origin_currency"]
 
-    # Keep the legacy 1Y/3Y diagnostics as a fallback and for validation history.
+    # Legacy 1Y/3Y history remains available for reproducibility and fallback.
     scored = add_origin_fx_tailwind_diagnostics(scored, origin_currency)
     scored = promote_origin_fx_tailwind_component(scored)
 
     # Phase 2: 1W / 1M / 3M / 1Y / 3Y bilateral FX timing. The ranking effect
-    # is capped so a currency shock can matter without overwhelming structural
-    # purchasing power and the user's quality preferences.
+    # is capped so timing can matter without overwhelming structural value.
     scored = add_fx_opportunity_v2(scored, origin_currency)
     scored = apply_fx_opportunity_to_ranking(scored)
 
-    # Broad purchasing power in the destination relative to the selected origin.
     scored["value_multiplier_relative"] = scored["tourism_pp_power"] / origin_pp
     scored["structural_purchasing_power"] = scored["value_multiplier_relative"]
     scored["purchasing_power_advantage_pct"] = (
