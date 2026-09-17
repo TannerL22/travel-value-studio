@@ -5,7 +5,7 @@ import { geoEqualEarth, geoGraticule, geoPath, type GeoPermissibleObjects } from
 import { scaleLinear } from "d3-scale";
 import { type Feature, type FeatureCollection, type Geometry } from "geojson";
 
-import { type RankingRow } from "@/app/page";
+import type { RankingRow } from "@/lib/types";
 
 type CountryProperties = {
   name?: string;
