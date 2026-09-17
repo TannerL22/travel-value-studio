@@ -15,6 +15,15 @@ CITY_USABILITY_WEIGHTS = {
     "digital_convenience": 0.20,
 }
 
+# Service Depth is currently proxied mainly by WEF's Tourist Services and
+# Infrastructure pillar. It is useful evidence of destination service capacity, but
+# not a complete measure of every everyday service a temporary resident uses. WGI
+# Political Stability is likewise one macro-risk signal, not personal safety. Both
+# therefore use bounded preference penalties so neither partial proxy can overwhelm
+# purchasing power + basic living foundations on its own.
+SERVICE_MAX_HAIRCUT = 0.45
+STABILITY_MAX_HAIRCUT = 0.45
+
 
 def structural_purchasing_power_factor(value: object, cheapness_priority: float) -> Optional[float]:
     """Direct, origin-relative purchasing-power factor with symmetric log saturation.
@@ -54,10 +63,18 @@ def _shortfall_penalty(
     threshold_high: float,
     strength_extra: float,
     coverage: float = 1.0,
+    max_haircut: float = 1.0,
 ) -> float:
+    """Coverage-aware shortfall penalty with an optional maximum dimension haircut.
+
+    ``max_haircut=1`` preserves the original hard shortfall behavior used for Basic
+    Comfort. Partial proxy dimensions can use a smaller cap so a single imperfect
+    signal cannot reduce the entire destination score toward zero by itself.
+    """
     req = float(np.clip(requirement, 0.0, 1.0))
     cov = float(np.clip(coverage, 0.0, 1.0))
-    if req <= 0 or cov <= 0:
+    haircut_cap = float(np.clip(max_haircut, 0.0, 1.0))
+    if req <= 0 or cov <= 0 or haircut_cap <= 0:
         return 1.0
     try:
         numeric = float(score)
@@ -68,20 +85,43 @@ def _shortfall_penalty(
     threshold = threshold_low + (threshold_high - threshold_low) * req
     strength = 1.0 + strength_extra * req
     full = float(np.clip(numeric / threshold, 0.0, 1.0) ** strength)
-    return float(1.0 - req * cov * (1.0 - full))
+    haircut = haircut_cap * req * cov * (1.0 - full)
+    return float(1.0 - haircut)
 
 
 def basic_comfort_penalty(score: object, requirement: float, coverage: float = 1.0) -> float:
-    return _shortfall_penalty(score, requirement, 55.0, 90.0, 1.5, coverage)
+    # Basic living foundations are the one requirement dimension allowed to impose a
+    # full shortfall penalty: water, sanitation, electricity, internet and healthcare
+    # access are directly relevant to whether a destination is practical to live in.
+    return _shortfall_penalty(score, requirement, 55.0, 90.0, 1.5, coverage, max_haircut=1.0)
 
 
 def service_depth_penalty(score: object, requirement: float, coverage: float = 1.0) -> float:
-    return _shortfall_penalty(score, requirement, 35.0, 75.0, 1.2, coverage)
+    # WEF Tourist Services is a narrow but useful proxy. A 25->55 target range covers
+    # basic through strong tourism/service infrastructure without treating a middling
+    # WEF score as evidence that ordinary services are nearly absent.
+    return _shortfall_penalty(
+        score,
+        requirement,
+        25.0,
+        55.0,
+        0.6,
+        coverage,
+        max_haircut=SERVICE_MAX_HAIRCUT,
+    )
 
 
 def stability_penalty(score: object, priority: float, coverage: float = 1.0) -> float:
-    """Preference-controlled stability shortfall; priority=0 is exactly neutral."""
-    return _shortfall_penalty(score, priority, 40.0, 75.0, 1.2, coverage)
+    """Bounded WGI political-stability shortfall; priority=0 is exactly neutral."""
+    return _shortfall_penalty(
+        score,
+        priority,
+        40.0,
+        70.0,
+        0.7,
+        coverage,
+        max_haircut=STABILITY_MAX_HAIRCUT,
+    )
 
 
 def apply_phase7_country_ranking(
