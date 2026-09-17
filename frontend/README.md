@@ -4,7 +4,7 @@ Next.js application for Travel Value Studio.
 
 ## Frontend v2 status
 
-**Phase 8 — Methodology & Trust Layer: implemented.**
+**Phase 9 — Mobile, Responsive & Accessibility Hardening: implemented.**
 
 The frontend is being rebuilt around a product architecture rather than the original model-debugging dashboard.
 
@@ -85,9 +85,38 @@ The route has two levels:
 1. **How it works** — a plain-language flow from reference market → purchasing power → comfort/services/stability floors → bounded FX timing → city shortlist. It also visualizes the production country scoring sequence without exposing internal development-phase labels.
 2. **Advanced methodology & evidence** — live backend model contract, component definitions/caveats, missing-data rules, known limitations and a searchable source registry.
 
-The advanced view reads `/api/methodology` and `/api/source-registry` rather than maintaining a separate frontend methodology contract. Component statuses are humanized for product display, while source details retain measure, caveat, geography, frequency, type and confidence metadata.
-
 The methodology page prominently states the largest current blind spot: furnished move-in-ready housing for roughly 30–90 day stays is not modeled because the available free data are not globally consistent enough for an auditable production comparison. Travel-to-destination cost, visa feasibility and comprehensive personal-safety risk are also explicitly outside the country value score.
+
+### Phase 9 mobile, responsive & accessibility hardening
+
+Phase 9 keeps the Phase 1–8 information architecture and hardens behavior across phone, tablet, keyboard and reduced-motion use cases.
+
+Key changes:
+
+- The global shell now includes a visible-on-focus **Skip to main content** link and the header becomes a two-row mobile layout rather than forcing brand + three navigation links into one narrow row.
+- Touch targets for primary actions, modal controls, comparison chips and country-detail actions are approximately 44px-class minimums.
+- `hooks/useModalDialog.ts` centralizes accessible modal behavior: initial focus, focus trapping, Escape-to-close, body-scroll lock and restoration of the previously focused control.
+- Preferences and the mobile map use that same dialog behavior. The mobile map also respects safe-area insets.
+- The map no longer creates a separate Tab stop for every country. It uses a single **roving keyboard focus** ordered by destination rank; arrow keys move focus and Enter/Space opens the destination. The ranked list remains the primary non-map alternative.
+- Destination-result and mobile-map Framer Motion transitions respect `prefers-reduced-motion`; global CSS also collapses residual animation/transition duration for reduced-motion users.
+- Discover, Country, Compare and Methodology now expose persistent inline loading/error/empty states with `aria-live`, `aria-busy`, `role=status` or `role=alert` as appropriate instead of relying on transient toast feedback or visually blank output.
+- Comparison remains horizontally scrollable on narrow screens, but the table is now a named keyboard-focusable region with table caption/scope semantics and a mobile swipe hint.
+- Country/city detail and comparison surfaces received targeted contrast and small-text improvements while preserving the dark visual system.
+- Dynamic viewport units (`dvh`), overscroll containment and safe-area padding are used where full-height mobile overlays or independently scrolling panels need them.
+
+Phase 9 acceptance targets are:
+
+```text
+375px phone       no structural horizontal page overflow; rankings first; map/dialog usable
+430px phone       same interaction model with comfortable touch targets
+Tablet            responsive stacked/grid layouts with no fixed-sidebar assumptions
+Laptop/Desktop    synchronized map/list and independent list scrolling retained
+Keyboard          skip link, visible focus, modal focus trap, map roving focus, table scrolling
+Reduced motion    no required information depends on animation
+Loading/Error     meaningful persistent state on every primary route
+```
+
+This is a code/CI acceptance contract. Final visual polish, spacing normalization, performance tuning and cross-device product QA remain Phase 10.
 
 ## Commands
 
