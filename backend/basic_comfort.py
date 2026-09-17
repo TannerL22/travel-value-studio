@@ -309,11 +309,11 @@ def add_basic_comfort_v3(df: pd.DataFrame, target_year: int) -> pd.DataFrame:
 
 
 def apply_basic_comfort_to_ranking(df: pd.DataFrame, comfort_requirement: float) -> pd.DataFrame:
-    """Apply user preference only after the objective Phase 3 comfort score exists."""
+    """Legacy helper aligned to the Phase 7.1 production Comfort curve."""
     out = df.copy()
     requirement = float(np.clip(comfort_requirement, 0.0, 1.0))
-    threshold = 55.0 + 35.0 * requirement
-    strength = 1.0 + 1.5 * requirement
+    threshold = 60.0 + 25.0 * requirement
+    strength = 1.0 + 0.5 * requirement
 
     comfort = pd.to_numeric(out.get("basic_comfort"), errors="coerce").fillna(50.0).clip(0.0, 100.0)
     full_penalty = (comfort / threshold).clip(0.0, 1.0).pow(strength)
