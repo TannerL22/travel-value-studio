@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitCompareArrows } from "lucide-react";
 
 import { formatFxRankingEffect } from "@/lib/ranking-explanations";
 import type { RankingRow } from "@/lib/types";
@@ -7,6 +7,7 @@ import type { RankingRow } from "@/lib/types";
 type CountryHeroProps = {
   country: RankingRow;
   backHref: string;
+  compareHref: string;
   imageUrl?: string | null;
   referenceLabel: string;
 };
@@ -14,7 +15,7 @@ type CountryHeroProps = {
 const score = (country: RankingRow) => country.quality_adjusted_value ?? country.Score ?? country.score ?? null;
 const purchasingPower = (country: RankingRow) => country.structural_purchasing_power ?? country.value_multiplier_relative ?? null;
 
-export function CountryHero({ country, backHref, imageUrl, referenceLabel }: CountryHeroProps) {
+export function CountryHero({ country, backHref, compareHref, imageUrl, referenceLabel }: CountryHeroProps) {
   const name = country.country ?? country.iso3 ?? "Unknown destination";
   const valueScore = score(country);
   const pp = purchasingPower(country);
@@ -23,9 +24,14 @@ export function CountryHero({ country, backHref, imageUrl, referenceLabel }: Cou
     <section className="overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/55">
       <div className="grid lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]">
         <div className="p-6 sm:p-8 lg:p-10">
-          <Link href={backHref} className="inline-flex items-center gap-2 text-sm text-zinc-400 transition hover:text-white">
-            <ArrowLeft className="h-4 w-4" /> Back to Discover
-          </Link>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Link href={backHref} className="inline-flex items-center gap-2 text-sm text-zinc-400 transition hover:text-white">
+              <ArrowLeft className="h-4 w-4" /> Back to Discover
+            </Link>
+            <Link href={compareHref} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-zinc-300 transition hover:border-white/20 hover:text-white">
+              <GitCompareArrows className="h-4 w-4" /> Compare this destination
+            </Link>
+          </div>
 
           <div className="mt-8 flex flex-wrap items-center gap-3 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
             <span>{country.iso3 ?? ""}</span>
