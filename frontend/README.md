@@ -4,7 +4,7 @@ Next.js application for Travel Value Studio.
 
 ## Frontend v2 status
 
-**Phase 5 — Country Detail: implemented.**
+**Phase 6 — City Shortlist: implemented.**
 
 The frontend is being rebuilt around a product architecture rather than the original model-debugging dashboard.
 
@@ -70,30 +70,34 @@ The temporary `DestinationModal` has been removed. Selecting a destination now n
 
 The active preference configuration therefore survives country navigation, browser back/forward, refreshes, and shared URLs.
 
-Country detail is composed from:
+Country detail is composed from decision-first sections: headline value context, actual ranking tailwinds/drags, purchasing power and FX timing, living foundations, city shortlist, then confidence and limitations. Furnished 30–90 day temporary housing, travel-to-destination cost, and comprehensive personal-safety risk remain explicitly outside the score.
+
+### Phase 6 city shortlist
+
+The technical `CityIntelligencePanel` has been removed. Country detail now uses:
 
 ```text
 components/country/
-  CountryDetailClient.tsx
-  CountryHero.tsx
-  RankingDrivers.tsx
-  ValueSummary.tsx
-  LivingFoundations.tsx
-  EvidenceSummary.tsx
+  CityShortlist.tsx
+  CityCard.tsx
 ```
 
-The page hierarchy is intentionally decision-first:
+The shortlist answers a narrower product question: which of the returned major-city candidates is worth investigating first? It preserves the backend City Usability score and candidate rank rather than creating a frontend city score.
 
-1. headline rank / value / purchasing power / FX context;
-2. actual ranking tailwinds and drags;
-3. current purchasing power and currency timing;
-4. comfort, service depth, and political-stability foundations;
-5. city candidates;
-6. data confidence and explicit model limitations.
+Each primary city card shows:
 
-The page explicitly states that furnished 30–90 day temporary housing is not modeled. Travel-to-destination cost and comprehensive personal-safety risk also remain outside the score. Legacy PPP-component cards, “similar profile” suggestions, “higher value” lists, and internal Phase labels are not part of the country experience.
+- candidate rank within the returned country set;
+- City Usability;
+- population;
+- evidence-coverage label;
+- the three highest observed amenity-category scores;
+- **National mobility context** and **National digital context**, explicitly avoiding the claim that these are direct city-level transit/digital measurements.
 
-Country imagery is fetched only on the country page rather than across the ranking list. City Intelligence remains a second-stage country drill-down; its full consumer presentation is the focus of Frontend Phase 6.
+The first three candidates are shown by default, with the remaining returned candidates available through `Show all`. The interface explicitly states that this is not an exhaustive ranking of every city or hidden gem.
+
+Raw evidence is available behind `View city evidence`: all six amenity categories, city-specific Amenity Depth, reference area, observed amenity density, and positive/unknown GTFS catalog evidence. A missing GTFS match is described as unknown rather than evidence that the city lacks public transport.
+
+City Usability remains separate from the country Quality-Adjusted Value ranking and temporary housing remains unmodeled.
 
 ## Commands
 
