@@ -19,10 +19,6 @@ TTDI_SERVICE_RANK_COLUMN = "Tourist Services and Infrastructure pillar: 2024 Ran
 POPULATION_INDICATOR = "SP.POP.TOTL"
 SERVICE_DEPTH_CACHE_TTL_SECONDS = int(os.getenv("SERVICE_DEPTH_CACHE_TTL_SECONDS", "86400"))
 
-# The WEF TTDI Tourist Services and Infrastructure pillar is already a supply-side
-# composite: hotel-room density, short-term-rental density, hotel/restaurant labour
-# productivity, and T&T capital investment intensity. We use it as the Phase 4
-# country-level bootstrap, then replace/augment it with city amenity data in Phase 5.
 TTDI_SOURCE_YEAR = 2024
 
 _CACHE_LOCK = threading.Lock()
@@ -164,8 +160,6 @@ def arrivals_maturity_fallback_score(arrivals_per_100_residents: object) -> Opti
         return None
     if not np.isfinite(value) or value < 0:
         return None
-    # Log transform stops tourism-heavy microstates from exploding the fallback.
-    # The fallback is capped at 70 because demand/popularity cannot prove service supply.
     normalized = math.log1p(value) / math.log1p(100.0)
     return float(min(70.0, max(0.0, normalized * 100.0)))
 
@@ -200,13 +194,11 @@ def add_service_depth_v4(df: pd.DataFrame, target_year: int) -> pd.DataFrame:
     if "service_depth_population_year" not in out.columns:
         out["service_depth_population_year"] = np.nan
 
+    arrivals = pd.to_numeric(out.get("intl_arrivals"), errors="coerce")
+    population_values = pd.to_numeric(out["service_depth_population"], errors="coerce")
     out["service_depth_arrivals_per_100"] = np.where(
-        pd.to_numeric(out.get("intl_arrivals"), errors="coerce").notna()
-        & pd.to_numeric(out["service_depth_population"], errors="coerce").notna()
-        & (pd.to_numeric(out["service_depth_population"], errors="coerce") > 0),
-        pd.to_numeric(out.get("intl_arrivals"), errors="coerce")
-        / pd.to_numeric(out["service_depth_population"], errors="coerce")
-        * 100.0,
+        arrivals.notna() & population_values.notna() & (population_values > 0),
+        arrivals / population_values * 100.0,
         np.nan,
     )
     out["service_depth_arrivals_fallback_score"] = out["service_depth_arrivals_per_100"].map(
@@ -257,9 +249,6 @@ def add_service_depth_v4(df: pd.DataFrame, target_year: int) -> pd.DataFrame:
     out["service_depth_reference_year"] = reference_years
     out["service_depth_flags"] = flags_list
     out["service_depth_source_warnings"] = "|".join(warnings)
-
-    # Compatibility alias: from Phase 4 onward this field means service supply,
-    # not raw international-arrivals depth. The old value is kept separately.
     out["component_tourism_depth"] = out["service_depth"]
     return out
 
@@ -292,4 +281,56 @@ def apply_service_depth_to_ranking(df: pd.DataFrame, service_requirement: float)
     out["component_overall_value"] = (
         100.0 * out["score"] / (maximum if pd.notna(maximum) and maximum > 0 else 1.0)
     ).round(2)
+    return out
+
+
+def align_data_quality_with_service_depth(df: pd.DataFrame) -> pd.DataFrame:
+    """Replace the legacy arrivals-quality assumption with Phase 4 source confidence."""
+    out = df.copy()
+    if "data_quality_score" not in out.columns or "data_quality_flags" not in out.columns:
+        return out
+
+    adjusted_scores = []
+    adjusted_flags = []
+    adjusted_grades = []
+
+    for _, row in out.iterrows():
+        try:
+            score = int(row.get("data_quality_score"))
+        except (TypeError, ValueError):
+            score = 0
+        raw_flags = row.get("data_quality_flags")
+        flags = list(raw_flags) if isinstance(raw_flags, list) else []
+        source = str(row.get("service_depth_source") or "unavailable")
+        service_flags = row.get("service_depth_flags")
+        service_flags = list(service_flags) if isinstance(service_flags, list) else []
+
+        had_missing_arrivals = "missing_arrivals" in flags
+        flags = [flag for flag in flags if flag != "missing_arrivals"]
+
+        if source == "wef_ttdi_2024_tourist_services":
+            if had_missing_arrivals:
+                score += 10
+        elif source == "arrivals_per_capita_fallback":
+            if "service_depth_arrivals_fallback" not in flags:
+                flags.append("service_depth_arrivals_fallback")
+            score -= 5
+        else:
+            if "missing_service_depth" not in flags:
+                flags.append("missing_service_depth")
+            if not had_missing_arrivals:
+                score -= 10
+
+        if "service_depth_source_warning" in service_flags and "service_depth_source_warning" not in flags:
+            flags.append("service_depth_source_warning")
+
+        score = int(np.clip(score, 0, 100))
+        grade = "A" if score >= 85 else "B" if score >= 70 else "C" if score >= 50 else "D"
+        adjusted_scores.append(score)
+        adjusted_flags.append(flags)
+        adjusted_grades.append(grade)
+
+    out["data_quality_score"] = adjusted_scores
+    out["data_quality_flags"] = adjusted_flags
+    out["data_quality_grade"] = adjusted_grades
     return out
