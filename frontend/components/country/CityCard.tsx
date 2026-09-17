@@ -61,14 +61,14 @@ export function CityCard({ city, fallbackRank }: CityCardProps) {
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-cyan-300/20 bg-cyan-300/[0.06] px-2.5 py-1 text-[10px] font-semibold text-cyan-200">#{rank} candidate</span>
-            <span className="text-xs text-zinc-500">Population {compactNumber(city.population)}</span>
+            <span className="rounded-full border border-cyan-300/20 bg-cyan-300/[0.06] px-2.5 py-1 text-[10px] font-semibold text-cyan-100">#{rank} candidate</span>
+            <span className="text-xs text-zinc-400">Population {compactNumber(city.population)}</span>
           </div>
           <div className="mt-3 flex items-center gap-2">
-            <MapPin className="h-4 w-4 shrink-0 text-cyan-300" />
-            <h3 className="truncate text-xl font-semibold tracking-tight text-white">{name}</h3>
+            <MapPin className="h-4 w-4 shrink-0 text-cyan-200" />
+            <h3 className="break-words text-xl font-semibold tracking-tight text-white">{name}</h3>
           </div>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
             {usabilityAvailable
               ? "City Usability is anchored by observed local amenity depth, with national mobility and digital context supporting the comparison."
               : "City Usability is unavailable because the required city-level amenity evidence is not currently observed."}
@@ -77,14 +77,14 @@ export function CityCard({ city, fallbackRank }: CityCardProps) {
 
         <div className="shrink-0 sm:text-right">
           <p className="text-4xl font-semibold tabular-nums tracking-tight text-white">{scoreLabel(city.city_usability)}</p>
-          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">City usability</p>
-          <p className="mt-2 text-xs text-zinc-500">{coverageLabel(city.city_usability_coverage)}</p>
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400">City usability</p>
+          <p className="mt-2 text-xs text-zinc-400">{coverageLabel(city.city_usability_coverage)}</p>
         </div>
       </div>
 
       {strongest.length > 0 ? (
         <div className="mt-5 border-t border-white/10 pt-5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Strongest observed amenity areas</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400">Strongest observed amenity areas</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {strongest.map((metric) => (
               <span key={metric.label} className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-zinc-300">
@@ -96,28 +96,28 @@ export function CityCard({ city, fallbackRank }: CityCardProps) {
       ) : null}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.025] px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-zinc-400"><TrainFront className="h-4 w-4 text-zinc-500" /> National mobility context</div>
+        <div className="flex min-h-11 items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.025] px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-zinc-300"><TrainFront className="h-4 w-4 text-zinc-400" /> National mobility context</div>
           <span className="font-semibold tabular-nums text-zinc-100">{scoreLabel(city.mobility)}</span>
         </div>
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.025] px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-zinc-400"><Wifi className="h-4 w-4 text-zinc-500" /> National digital context</div>
+        <div className="flex min-h-11 items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.025] px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-zinc-300"><Wifi className="h-4 w-4 text-zinc-400" /> National digital context</div>
           <span className="font-semibold tabular-nums text-zinc-100">{scoreLabel(city.digital_convenience)}</span>
         </div>
       </div>
 
       <details className="group mt-5 border-t border-white/10 pt-4">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm text-zinc-400 transition hover:text-zinc-200">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 rounded-md text-sm text-zinc-300 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
           <span className="inline-flex items-center gap-2"><Database className="h-4 w-4" /> View city evidence</span>
           <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
         </summary>
 
-        <div className="mt-4 space-y-4 text-xs text-zinc-500">
+        <div className="mt-4 space-y-4 text-xs text-zinc-400">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
             {metrics.map((metric) => (
               <div key={metric.label} className="rounded-lg border border-white/5 bg-white/[0.025] p-3">
-                <p className="text-[9px] uppercase tracking-[0.1em] text-zinc-600">{metric.label}</p>
-                <p className="mt-1 text-sm font-semibold tabular-nums text-zinc-200">{scoreLabel(metric.value)}</p>
+                <p className="text-[9px] uppercase tracking-[0.1em] text-zinc-400">{metric.label}</p>
+                <p className="mt-1 text-sm font-semibold tabular-nums text-zinc-100">{scoreLabel(metric.value)}</p>
               </div>
             ))}
           </div>
@@ -133,7 +133,7 @@ export function CityCard({ city, fallbackRank }: CityCardProps) {
             />
           </div>
 
-          <p className="leading-5 text-zinc-600">
+          <p className="leading-5 text-zinc-400">
             City Usability uses observed Amenity Depth as the required city-specific anchor. Mobility and Digital Convenience are supporting national context; missing context reduces coverage rather than being treated as poor performance. This candidate rank applies only to the cities returned for this country and is not an exhaustive hidden-gem ranking.
           </p>
         </div>
@@ -145,9 +145,9 @@ export function CityCard({ city, fallbackRank }: CityCardProps) {
 function EvidenceItem({ label, value, note }: { label: string; value: string; note: string }) {
   return (
     <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
-      <p className="text-[9px] uppercase tracking-[0.1em] text-zinc-600">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-zinc-200">{value}</p>
-      <p className="mt-1 leading-4 text-zinc-600">{note}</p>
+      <p className="text-[9px] uppercase tracking-[0.1em] text-zinc-400">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-zinc-100">{value}</p>
+      <p className="mt-1 leading-4 text-zinc-400">{note}</p>
     </div>
   );
 }
