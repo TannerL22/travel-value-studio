@@ -4,6 +4,7 @@ import pandas as pd
 
 from basic_comfort import (
     PILLAR_WEIGHTS,
+    _combine_access_quality,
     _legacy_gdp_comfort,
     _select_service,
     _weighted_geometric,
@@ -22,10 +23,36 @@ def test_saturating_thresholds() -> None:
 
 
 def test_basic_water_fallback_is_explicitly_weaker() -> None:
+    # Legacy helper remains stable for compatibility; production WASH scoring now
+    # uses _combine_access_quality instead.
     score, reliability, source = _select_service(None, 100.0, 50.0, 95.0)
     assert score == 0.88
     assert reliability == 0.75
     assert source == "basic_fallback"
+
+
+def test_basic_access_is_not_erased_by_stricter_safely_managed_measure() -> None:
+    # Near-universal basic access with a weaker safely-managed result should retain a
+    # strong basic-living-standards score while still reflecting the quality shortfall.
+    score, reliability, source = _combine_access_quality(100.0, 27.0, 45.0, 90.0)
+    assert score is not None
+    assert 0.60 < score < 0.70
+    assert reliability == 1.0
+    assert source == "basic_plus_safely_managed"
+
+
+def test_basic_only_access_is_high_score_with_reduced_evidence_reliability() -> None:
+    score, reliability, source = _combine_access_quality(100.0, None, 50.0, 95.0)
+    assert score == 1.0
+    assert reliability == 0.90
+    assert source == "basic_only"
+
+
+def test_safe_only_access_remains_usable_but_lower_confidence() -> None:
+    score, reliability, source = _combine_access_quality(None, 95.0, 50.0, 95.0)
+    assert score == 1.0
+    assert reliability == 0.80
+    assert source == "safely_managed_only"
 
 
 def test_weighted_geometric_is_coverage_aware() -> None:
@@ -102,6 +129,9 @@ def test_high_comfort_requirement_can_change_order() -> None:
 def main() -> None:
     test_saturating_thresholds()
     test_basic_water_fallback_is_explicitly_weaker()
+    test_basic_access_is_not_erased_by_stricter_safely_managed_measure()
+    test_basic_only_access_is_high_score_with_reduced_evidence_reliability()
+    test_safe_only_access_remains_usable_but_lower_confidence()
     test_weighted_geometric_is_coverage_aware()
     test_legacy_fallback_is_objective_and_saturating()
     test_zero_comfort_requirement_removes_comfort_penalty()
