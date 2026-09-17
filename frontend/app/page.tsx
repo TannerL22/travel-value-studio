@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AlertCircle, BookOpen, GitCompareArrows, Map, X } from "lucide-react";
@@ -9,20 +10,26 @@ import { RankingList } from "@/components/discover/RankingList";
 import { PreferenceBar } from "@/components/preferences/PreferenceBar";
 import { PreferenceDrawer } from "@/components/preferences/PreferenceDrawer";
 import { AppShell } from "@/components/shell/AppShell";
-import { WorldMap } from "@/components/WorldMap";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useModalDialog } from "@/hooks/useModalDialog";
 import { useOrigins } from "@/hooks/useOrigins";
 import { useRankings } from "@/hooks/useRankings";
 import { DEFAULT_FILTERS, parsePreferences, preferencesToSearchParams } from "@/lib/preferences";
 import type { FilterState, RankingRow } from "@/lib/types";
 
+const WorldMap = dynamic(() => import("@/components/WorldMap").then((module) => module.WorldMap), {
+  ssr: false,
+  loading: () => <MapLoading />,
+});
+
 const countryKey = (country: RankingRow) => (country.iso3 ?? country.country ?? "unknown").toUpperCase();
 
 export default function Home() {
   const router = useRouter();
+  const showDesktopMap = useMediaQuery("(min-width: 1024px)");
   const mobileMapDialogRef = useRef<HTMLDivElement | null>(null);
   const mobileMapCloseRef = useRef<HTMLButtonElement | null>(null);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
@@ -149,7 +156,9 @@ export default function Home() {
 
       <section className="hidden gap-6 lg:grid lg:grid-cols-[minmax(0,1.62fr)_minmax(360px,1fr)] lg:items-start" aria-label="Map and ranked destinations">
         <div className="sticky top-24 min-w-0">
-          <WorldMap results={results} activeCountryKey={hoveredCountryKey} onCountryHover={handleCountryHover} onCountryClick={openCountry} />
+          {showDesktopMap ? (
+            <WorldMap results={results} activeCountryKey={hoveredCountryKey} onCountryHover={handleCountryHover} onCountryClick={openCountry} />
+          ) : <MapLoading />}
           <div className="mt-3 flex items-center justify-between gap-4 px-1 text-xs text-zinc-500">
             <span>Map colour represents Quality-Adjusted Value.</span>
             <span>{results.length ? `${results.length} destinations` : ""}</span>
@@ -193,5 +202,14 @@ export default function Home() {
 
       <PreferenceDrawer isOpen={isPreferenceOpen} values={filters} setValues={setFilters} origins={origins} onClose={() => setIsPreferenceOpen(false)} />
     </AppShell>
+  );
+}
+
+function MapLoading() {
+  return (
+    <div className="relative aspect-[2/1] w-full overflow-hidden rounded-2xl border border-white/[0.07] bg-zinc-950/70" aria-live="polite" aria-busy="true">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_45%_40%,rgba(34,211,238,0.06),transparent_36%)]" aria-hidden="true" />
+      <p className="absolute inset-0 flex items-center justify-center text-sm text-zinc-500">Loading map…</p>
+    </div>
   );
 }
