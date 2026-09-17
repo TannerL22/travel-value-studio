@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowRight, BookOpen, Globe, LayoutGrid, Plus, X } from "lucide-react";
+import { ArrowRight, BookOpen, Map, Plus, X } from "lucide-react";
 
-import { DestinationResult } from "@/components/discover/DestinationResult";
+import { RankingList } from "@/components/discover/RankingList";
 import { DestinationModal } from "@/components/DestinationModal";
 import { MethodologyPanel } from "@/components/MethodologyPanel";
 import { PreferenceBar } from "@/components/preferences/PreferenceBar";
@@ -14,8 +14,6 @@ import { AppShell } from "@/components/shell/AppShell";
 import { WorldMap } from "@/components/WorldMap";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Toaster } from "@/components/ui/sonner";
 import { useOrigins } from "@/hooks/useOrigins";
 import { useRankings } from "@/hooks/useRankings";
@@ -23,7 +21,7 @@ import { apiUrl } from "@/lib/api";
 import { DEFAULT_FILTERS, parsePreferences, preferencesToSearchParams } from "@/lib/preferences";
 import type { FilterState, RankingRow } from "@/lib/types";
 
-const countryKey = (country: RankingRow) => country.iso3 ?? country.country ?? "unknown";
+const countryKey = (country: RankingRow) => (country.iso3 ?? country.country ?? "unknown").toUpperCase();
 
 const formatMetric = (value: number | null | undefined, suffix = "") => {
   if (value == null || !Number.isFinite(value)) return "N/A";
@@ -34,13 +32,14 @@ export default function Home() {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [urlHydrated, setUrlHydrated] = useState(false);
   const [sortBy, setSortBy] = useState<"value" | "purchasing_power" | "stability">("value");
-  const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
   const [imageMap, setImageMap] = useState<Record<string, string>>({});
   const [compareList, setCompareList] = useState<RankingRow[]>([]);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false);
   const [isPreferenceOpen, setIsPreferenceOpen] = useState(false);
+  const [isMobileMapOpen, setIsMobileMapOpen] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<RankingRow | null>(null);
+  const [hoveredCountryKey, setHoveredCountryKey] = useState<string | null>(null);
 
   const { origins, error: originsError } = useOrigins();
   const { results, loading: rankingsLoading, error: rankingsError } = useRankings(filters, urlHydrated);
@@ -90,6 +89,20 @@ export default function Home() {
     return () => controller.abort();
   }, [selectedCountry, imageMap]);
 
+  useEffect(() => {
+    if (!isMobileMapOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsMobileMapOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isMobileMapOpen]);
+
   const toggleCompare = (country: RankingRow) => {
     const key = countryKey(country);
     if (compareList.some((c) => countryKey(c) === key) && compareList.length <= 2) setIsCompareOpen(false);
@@ -114,6 +127,15 @@ export default function Home() {
     return items.sort((a, b) => (b.quality_adjusted_value ?? b.Score ?? b.score ?? -Infinity) - (a.quality_adjusted_value ?? a.Score ?? a.score ?? -Infinity));
   }, [results, sortBy]);
 
+  const handleCountryHover = (country: RankingRow | null) => {
+    setHoveredCountryKey(country ? countryKey(country) : null);
+  };
+
+  const handleMobileMapSelect = (country: RankingRow) => {
+    setIsMobileMapOpen(false);
+    setSelectedCountry(country);
+  };
+
   return (
     <AppShell>
       <Toaster theme="dark" />
@@ -130,12 +152,9 @@ export default function Home() {
           <Button type="button" variant="outline" className="h-10 border-white/10 bg-zinc-950/60 px-3 text-xs uppercase tracking-[0.16em] text-zinc-200" onClick={() => setIsMethodologyOpen(true)}>
             <BookOpen className="h-3.5 w-3.5" /> Method
           </Button>
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "map")} className="rounded-lg border border-white/10 bg-zinc-950/60 p-1">
-            <TabsList className="h-8 bg-transparent">
-              <TabsTrigger value="grid" className="h-full gap-2 px-3 text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-white/10 data-[state=active]:text-white"><LayoutGrid className="h-3.5 w-3.5" /> Results</TabsTrigger>
-              <TabsTrigger value="map" className="h-full gap-2 px-3 text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-white/10 data-[state=active]:text-white"><Globe className="h-3.5 w-3.5" /> Map</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <Button type="button" variant="outline" className="h-10 gap-2 border-white/10 bg-zinc-950/60 px-3 text-xs uppercase tracking-[0.16em] text-zinc-200 lg:hidden" onClick={() => setIsMobileMapOpen(true)}>
+            <Map className="h-3.5 w-3.5" /> Map
+          </Button>
           <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
             <SelectTrigger className="h-10 w-full border-white/10 bg-zinc-950/60 text-xs uppercase tracking-[0.16em] text-zinc-200 sm:w-56"><SelectValue placeholder="Sort by" /></SelectTrigger>
             <SelectContent className="border-white/10 bg-zinc-950 text-zinc-100">
@@ -151,34 +170,80 @@ export default function Home() {
         <PreferenceBar values={filters} origins={origins} onOpen={() => setIsPreferenceOpen(true)} />
       </div>
 
-      <AnimatePresence mode="wait">
-        {viewMode === "grid" ? (
-          <motion.div key="grid" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {loading
-              ? Array.from({ length: 9 }).map((_, index) => (
-                  <div key={`skeleton-${index}`} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-2"><Skeleton className="h-3 w-8 bg-white/10" /><Skeleton className="h-6 w-32 bg-white/10" /></div>
-                      <Skeleton className="h-9 w-12 bg-white/10" />
-                    </div>
-                    <div className="mt-5 grid grid-cols-2 gap-3 border-y border-white/10 py-4"><Skeleton className="h-9 bg-white/10" /><Skeleton className="h-9 bg-white/10" /></div>
-                    <Skeleton className="mt-5 h-16 w-full bg-white/10" />
-                  </div>
-                ))
-              : sortedResults.map((row, index) => (
-                  <DestinationResult
-                    key={countryKey(row)}
-                    country={row}
-                    index={index}
-                    onClick={() => setSelectedCountry(row)}
-                  />
-                ))}
+      <section className="hidden gap-5 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(360px,2fr)] lg:items-start">
+        <div className="sticky top-5 min-w-0">
+          <WorldMap
+            results={results}
+            activeCountryKey={hoveredCountryKey}
+            onCountryHover={handleCountryHover}
+            onCountryClick={(country) => setSelectedCountry(country)}
+          />
+          <div className="mt-3 flex items-center justify-between gap-4 px-1 text-xs text-zinc-600">
+            <span>Map color always represents Quality-Adjusted Value.</span>
+            <span>{results.length ? `${results.length} destinations` : ""}</span>
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <div className="mb-3 flex items-end justify-between gap-4 px-1">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Ranked destinations</p>
+              <p className="mt-1 text-sm text-zinc-400">Hover a result to locate it on the map.</p>
+            </div>
+          </div>
+          <div className="max-h-[calc(100vh-7rem)] overflow-y-auto pr-2 [scrollbar-color:#3f3f46_transparent] [scrollbar-width:thin]">
+            <RankingList
+              results={sortedResults}
+              loading={loading}
+              activeCountryKey={hoveredCountryKey}
+              onCountryHover={handleCountryHover}
+              onCountrySelect={setSelectedCountry}
+              compact
+              skeletonCount={6}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="lg:hidden">
+        <RankingList
+          results={sortedResults}
+          loading={loading}
+          activeCountryKey={hoveredCountryKey}
+          onCountryHover={handleCountryHover}
+          onCountrySelect={setSelectedCountry}
+          skeletonCount={7}
+        />
+      </section>
+
+      <AnimatePresence>
+        {isMobileMapOpen ? (
+          <motion.div
+            className="fixed inset-0 z-[65] flex flex-col bg-zinc-950 lg:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Discovery map</p>
+                <p className="mt-1 text-sm font-semibold text-white">Quality-Adjusted Value</p>
+              </div>
+              <button type="button" onClick={() => setIsMobileMapOpen(false)} className="rounded-full border border-white/10 bg-white/5 p-2 text-zinc-300" aria-label="Close map">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-1 items-center px-3 py-4 sm:px-5">
+              <WorldMap
+                results={results}
+                activeCountryKey={hoveredCountryKey}
+                onCountryHover={handleCountryHover}
+                onCountryClick={handleMobileMapSelect}
+              />
+            </div>
+            <div className="border-t border-white/10 px-4 py-3 text-center text-xs text-zinc-500">Select a country to inspect its value drivers.</div>
           </motion.div>
-        ) : (
-          <motion.div key="map" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="w-full">
-            <WorldMap results={results} onCountryClick={(country) => setSelectedCountry(country)} />
-          </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
 
       {selectedCountry ? (
