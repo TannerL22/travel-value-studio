@@ -11,8 +11,8 @@ export function LivingFoundations({ country }: { country: RankingRow }) {
         title="The conditions that can reduce otherwise-cheap destination value"
         description="These are threshold-style safeguards, not rich-country bonuses. They matter when a destination falls short of the level implied by your preferences."
       />
-      <div className="mt-5 grid gap-4 md:grid-cols-3">
-        <FoundationCard
+      <div className="mt-6 grid gap-7 border-y border-white/[0.08] py-6 md:grid-cols-3 md:gap-0 md:divide-x md:divide-white/[0.08]">
+        <FoundationBlock
           icon={HeartPulse}
           label="Basic comfort"
           score={country.basic_comfort}
@@ -20,7 +20,7 @@ export function LivingFoundations({ country }: { country: RankingRow }) {
           coverage={country.basic_comfort_coverage}
           note="Water, sanitation, electricity, internet access and health-service baseline."
         />
-        <FoundationCard
+        <FoundationBlock
           icon={Building2}
           label="Service depth"
           score={country.service_depth}
@@ -28,7 +28,7 @@ export function LivingFoundations({ country }: { country: RankingRow }) {
           coverage={country.service_depth_coverage}
           note="Established accommodation and visitor-service supply; not a tourism-popularity score."
         />
-        <FoundationCard
+        <FoundationBlock
           icon={Landmark}
           label="Political stability"
           score={country.stability ?? country.component_safety_stability}
@@ -41,19 +41,19 @@ export function LivingFoundations({ country }: { country: RankingRow }) {
   );
 }
 
-function FoundationCard({ icon: Icon, label, score, factor, coverage, note }: { icon: typeof HeartPulse; label: string; score?: number | null; factor?: number | null; coverage?: number | null; note: string }) {
+function FoundationBlock({ icon: Icon, label, score, factor, coverage, note }: { icon: typeof HeartPulse; label: string; score?: number | null; factor?: number | null; coverage?: number | null; note: string }) {
   const effect = typeof factor === "number" && Number.isFinite(factor) ? (factor - 1) * 100 : null;
   const effectLabel = effect == null ? "No effect data" : Math.abs(effect) < 0.5 ? "No material penalty" : `${Math.round(effect)}% rank effect`;
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-2 text-zinc-500"><Icon className="h-4 w-4" /><p className="text-[10px] font-semibold uppercase tracking-[0.14em]">{label}</p></div>
-        <span className={`rounded-full border px-2.5 py-1 text-[10px] ${effect != null && effect < -0.5 ? "border-amber-300/20 bg-amber-300/5 text-amber-300" : "border-white/10 bg-white/[0.03] text-zinc-400"}`}>{effectLabel}</span>
+    <div className="md:px-6 md:first:pl-0 md:last:pr-0">
+      <div className="flex items-center gap-2 text-zinc-500"><Icon className="h-4 w-4" aria-hidden="true" /><p className="text-sm font-medium text-zinc-300">{label}</p></div>
+      <div className="mt-3 flex items-end justify-between gap-4">
+        <p className="text-3xl font-semibold tabular-nums tracking-tight text-white">{score != null && Number.isFinite(score) ? Math.round(score) : "N/A"}</p>
+        <span className={effect != null && effect < -0.5 ? "text-xs font-medium text-amber-200" : "text-xs text-zinc-500"}>{effectLabel}</span>
       </div>
-      <p className="mt-4 text-3xl font-semibold tabular-nums tracking-tight text-white">{score != null && Number.isFinite(score) ? Math.round(score) : "N/A"}</p>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-zinc-300" style={{ width: `${score != null ? Math.max(0, Math.min(100, score)) : 0}%` }} /></div>
+      <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/[0.06]"><div className="h-full rounded-full bg-zinc-300" style={{ width: `${score != null ? Math.max(0, Math.min(100, score)) : 0}%` }} /></div>
       <p className="mt-3 text-xs leading-5 text-zinc-500">{note}</p>
-      {coverage != null ? <p className="mt-3 text-[10px] uppercase tracking-[0.1em] text-zinc-600">Evidence coverage {Math.round(coverage * 100)}%</p> : null}
+      {coverage != null ? <p className="mt-2 text-xs text-zinc-600">Evidence coverage {Math.round(coverage * 100)}%</p> : null}
     </div>
   );
 }
