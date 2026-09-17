@@ -41,6 +41,15 @@ PILLAR_THRESHOLDS = {
     "health": (40.0, 80.0),
 }
 
+# JMP "at least basic" access is the appropriate foundation for a basic-living-
+# standards screen. "Safely managed" is a materially stricter quality standard
+# (on premises/available when needed/quality or safe disposal), so it improves the
+# pillar rather than replacing evidence that a basic service is actually available.
+BASIC_ACCESS_WEIGHT = 0.65
+SAFELY_MANAGED_QUALITY_WEIGHT = 0.35
+BASIC_ONLY_RELIABILITY = 0.90
+SAFE_ONLY_RELIABILITY = 0.80
+
 _CACHE_LOCK = threading.Lock()
 _CACHE: Dict[int, Tuple[float, pd.DataFrame, str]] = {}
 
@@ -143,12 +152,43 @@ def _legacy_gdp_comfort(value: object) -> float:
 
 
 def _select_service(preferred: object, fallback: object, floor: float, target: float) -> Tuple[Optional[float], float, str]:
+    """Legacy selector retained for compatibility tests/callers.
+
+    New water/sanitation scoring uses ``_combine_access_quality`` because safely
+    managed and at-least-basic JMP measures are nested standards, not substitutes.
+    """
     preferred_score = saturating_service_score(preferred, floor, target)
     if preferred_score is not None:
         return preferred_score, 1.0, "preferred"
     fallback_score = saturating_service_score(fallback, floor, target)
     if fallback_score is not None:
         return min(fallback_score, 0.88), 0.75, "basic_fallback"
+    return None, 0.0, "missing"
+
+
+def _combine_access_quality(
+    basic: object,
+    safely_managed: object,
+    floor: float,
+    target: float,
+) -> Tuple[Optional[float], float, str]:
+    """Combine basic access with the stricter safely-managed quality standard.
+
+    Basic access answers whether the household service is practically available.
+    Safely managed access adds a quality/reliability signal. When both are observed,
+    basic access carries 65% of the pillar and safely-managed quality 35%. Missing one
+    dimension reduces evidence reliability rather than turning the missing dimension
+    into a zero.
+    """
+    basic_score = saturating_service_score(basic, floor, target)
+    safe_score = saturating_service_score(safely_managed, floor, target)
+    if basic_score is not None and safe_score is not None:
+        combined = BASIC_ACCESS_WEIGHT * basic_score + SAFELY_MANAGED_QUALITY_WEIGHT * safe_score
+        return float(np.clip(combined, 0.0, 1.0)), 1.0, "basic_plus_safely_managed"
+    if basic_score is not None:
+        return basic_score, BASIC_ONLY_RELIABILITY, "basic_only"
+    if safe_score is not None:
+        return safe_score, SAFE_ONLY_RELIABILITY, "safely_managed_only"
     return None, 0.0, "missing"
 
 
@@ -201,11 +241,11 @@ def add_basic_comfort_v3(df: pd.DataFrame, target_year: int) -> pd.DataFrame:
     flags_list = []
 
     for _, row in out.iterrows():
-        water, water_rel, water_source = _select_service(
-            row.get("comfort_water_safe_pct"), row.get("comfort_water_basic_pct"), *PILLAR_THRESHOLDS["water"]
+        water, water_rel, water_source = _combine_access_quality(
+            row.get("comfort_water_basic_pct"), row.get("comfort_water_safe_pct"), *PILLAR_THRESHOLDS["water"]
         )
-        sanitation, sanitation_rel, sanitation_source = _select_service(
-            row.get("comfort_sanitation_safe_pct"), row.get("comfort_sanitation_basic_pct"), *PILLAR_THRESHOLDS["sanitation"]
+        sanitation, sanitation_rel, sanitation_source = _combine_access_quality(
+            row.get("comfort_sanitation_basic_pct"), row.get("comfort_sanitation_safe_pct"), *PILLAR_THRESHOLDS["sanitation"]
         )
         electricity = saturating_service_score(row.get("comfort_electricity_pct"), *PILLAR_THRESHOLDS["electricity"])
         internet = saturating_service_score(row.get("comfort_internet_pct"), *PILLAR_THRESHOLDS["internet"])
@@ -230,9 +270,11 @@ def add_basic_comfort_v3(df: pd.DataFrame, target_year: int) -> pd.DataFrame:
             source = "direct_services" if coverage >= 0.95 else "blended_direct_legacy"
 
         flags = []
-        if water_source == "basic_fallback": flags.append("water_basic_fallback")
+        if water_source == "basic_only": flags.append("water_safely_managed_missing")
+        elif water_source == "safely_managed_only": flags.append("water_basic_missing")
         elif water_source == "missing": flags.append("missing_water")
-        if sanitation_source == "basic_fallback": flags.append("sanitation_basic_fallback")
+        if sanitation_source == "basic_only": flags.append("sanitation_safely_managed_missing")
+        elif sanitation_source == "safely_managed_only": flags.append("sanitation_basic_missing")
         elif sanitation_source == "missing": flags.append("missing_sanitation")
         for pillar, value in [("electricity", electricity), ("internet", internet), ("health", health)]:
             if value is None: flags.append(f"missing_{pillar}")
