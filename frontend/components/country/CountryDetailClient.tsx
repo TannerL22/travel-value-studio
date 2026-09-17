@@ -27,6 +27,7 @@ export function CountryDetailClient({ iso3, queryString }: { iso3: string; query
   const preferenceQuery = useMemo(() => preferencesToSearchParams(filters).toString(), [filters]);
   const backHref = `/?${preferenceQuery}`;
   const compareHref = `/compare?${preferenceQuery}&countries=${iso3.toUpperCase()}`;
+  const methodologyHref = `/methodology?${preferenceQuery}`;
 
   useEffect(() => {
     if (!country) return;
@@ -68,7 +69,7 @@ export function CountryDetailClient({ iso3, queryString }: { iso3: string; query
 
   return (
     <div className="space-y-12 pb-10 sm:space-y-16">
-      <CountryHero country={country} backHref={backHref} compareHref={compareHref} imageUrl={imageUrl} referenceLabel={referenceLabel} />
+      <CountryHero country={country} backHref={backHref} compareHref={compareHref} methodologyHref={methodologyHref} imageUrl={imageUrl} referenceLabel={referenceLabel} />
 
       <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4 sm:px-6">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-500">
