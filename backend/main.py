@@ -132,13 +132,10 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     tourism_infra_weight = 0.1 + 1.2 * query.supply_need
     arrivals_weight = 0.2 + 0.6 * query.supply_need
     safety_weight = 0.1 + 1.3 * query.risk_pri
-    tourism_cost_weight = float(
-        np.clip(0.2 + 0.9 * query.budget_sens + 0.2 * query.comfort, 0.0, 1.5)
-    )
+    # Phase 3 decouples comfort preference from cheapness weighting. Comfort now
+    # acts only through the dedicated Basic Comfort threshold/penalty layer.
+    tourism_cost_weight = float(np.clip(0.2 + 1.0 * query.budget_sens, 0.0, 1.5))
 
-    # Legacy score construction is retained for reproducibility. Phase 3 then
-    # reconstructs the production score without the legacy GDP comfort penalty
-    # and replaces it with direct basic-service evidence.
     scored = compute_scores(
         df_raw,
         nominal_penalty_exp=float(alpha),
@@ -156,11 +153,8 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     origin_pp = origin_context["origin_pp_multiplier"]
     origin_currency = origin_context["origin_currency"]
 
-    # Legacy 1Y/3Y history remains available for reproducibility and fallback.
     scored = add_origin_fx_tailwind_diagnostics(scored, origin_currency)
     scored = promote_origin_fx_tailwind_component(scored)
-
-    # Phase 2 timing layer remains downstream of Phase 3 structural comfort.
     scored = add_fx_opportunity_v2(scored, origin_currency)
     scored = apply_fx_opportunity_to_ranking(scored)
 
