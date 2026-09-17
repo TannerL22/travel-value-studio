@@ -4,7 +4,7 @@ Next.js application for Travel Value Studio.
 
 ## Frontend v2 status
 
-**Phase 6 — City Shortlist: implemented.**
+**Phase 7 — Country Comparison: implemented.**
 
 The frontend is being rebuilt around a product architecture rather than the original model-debugging dashboard.
 
@@ -14,7 +14,7 @@ The frontend is being rebuilt around a product architecture rather than the orig
 app/
   page.tsx                 Discover
   country/[iso3]/page.tsx  Country detail
-  compare/page.tsx         Comparison route scaffold
+  compare/page.tsx         Comparison
   methodology/page.tsx     Methodology route scaffold
 
 components/shell/
@@ -84,20 +84,40 @@ components/country/
 
 The shortlist answers a narrower product question: which of the returned major-city candidates is worth investigating first? It preserves the backend City Usability score and candidate rank rather than creating a frontend city score.
 
-Each primary city card shows:
-
-- candidate rank within the returned country set;
-- City Usability;
-- population;
-- evidence-coverage label;
-- the three highest observed amenity-category scores;
-- **National mobility context** and **National digital context**, explicitly avoiding the claim that these are direct city-level transit/digital measurements.
+Each primary city card shows candidate rank, City Usability, population, evidence coverage, the strongest observed amenity categories, and explicitly labeled **National mobility context** / **National digital context**. Raw amenity, density, area, and GTFS catalog evidence is available behind `View city evidence`.
 
 The first three candidates are shown by default, with the remaining returned candidates available through `Show all`. The interface explicitly states that this is not an exhaustive ranking of every city or hidden gem.
 
-Raw evidence is available behind `View city evidence`: all six amenity categories, city-specific Amenity Depth, reference area, observed amenity density, and positive/unknown GTFS catalog evidence. A missing GTFS match is described as unknown rather than evidence that the city lacks public transport.
+### Phase 7 country comparison
 
-City Usability remains separate from the country Quality-Adjusted Value ranking and temporary housing remains unmodeled.
+Comparison is now a dedicated, shareable route rather than an overlay:
+
+```text
+/compare?origin=GBR&value=0.70&comfort=0.55&services=0.65&stability=0.75&countries=JPN,THA,MYS
+```
+
+The route preserves the same reference market and preference settings used by Discover and country detail. Users can add or remove up to three destinations and the `countries` query parameter updates automatically.
+
+Phase 7 adds:
+
+```text
+components/compare/
+  CompareClient.tsx
+  CompareSelector.tsx
+  ComparisonMatrix.tsx
+  TradeoffSummary.tsx
+
+lib/
+  comparison.ts
+```
+
+The comparison page intentionally does **not** calculate another score or declare a winner. It shows the same production country evidence side-by-side — Quality-Adjusted Value, purchasing power, bounded FX rank effect, Basic Comfort, Service Depth, Political Stability and data quality — then generates factual difference statements such as one destination having higher purchasing power or a higher observed comfort score.
+
+`lib/comparison.ts` is interpretation-only. It reads existing backend fields and describes spreads between selected countries; it never changes country order or weights.
+
+Discover now has a preference-preserving Compare entry point. Country detail also exposes `Compare this destination`, opening the comparison route with that country preselected and the current model configuration intact.
+
+The comparison page repeats the major scope caveats: temporary furnished housing, travel-to-destination cost, visa feasibility and comprehensive personal-safety risk are not part of the country value score.
 
 ## Commands
 
