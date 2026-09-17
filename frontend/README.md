@@ -4,7 +4,7 @@ Next.js application for Travel Value Studio.
 
 ## Frontend v2 status
 
-**Phase 4 — Integrated Discovery Map: implemented.**
+**Phase 5 — Country Detail: implemented.**
 
 The frontend is being rebuilt around a product architecture rather than the original model-debugging dashboard.
 
@@ -13,7 +13,7 @@ The frontend is being rebuilt around a product architecture rather than the orig
 ```text
 app/
   page.tsx                 Discover
-  country/[iso3]/page.tsx  Country-detail route scaffold
+  country/[iso3]/page.tsx  Country detail
   compare/page.tsx         Comparison route scaffold
   methodology/page.tsx     Methodology route scaffold
 
@@ -48,52 +48,52 @@ The collapsed Preference Bar shows the selected reference market/currency plus s
 
 The responsive Preference Drawer opens as a bottom sheet on smaller screens and a right-side panel on larger screens. It preserves the exact continuous 0–1 backend parameters while presenting plain-language states such as `Flexible`, `Balanced`, `High`, `Very high`, and `Ignore`. Changes update rankings immediately and continue to persist through the URL.
 
-`lib/preferences.ts` is the single frontend definition for preference labels, semantic state mapping, URL serialization/parsing, and reset behavior. Resetting preferences leaves the selected reference market and year intact.
-
 ### Phase 3 ranked results
 
-The photo-heavy `DestinationCard` has been removed. Discover now uses:
+Discover uses `DestinationResult.tsx` plus `lib/ranking-explanations.ts`. Result cards expose production rank, Quality-Adjusted Value, origin-relative purchasing power, bounded FX effect, and actual backend ranking drivers. Visitor arrivals, stars, value percentiles, hover-only metrics, and frontend-created verdict scores were removed.
 
-```text
-components/discover/
-  DestinationResult.tsx
-
-lib/
-  ranking-explanations.ts
-```
-
-Each result exposes the backend value rank, Quality-Adjusted Value score, origin-relative purchasing power, bounded FX ranking effect, and direct Comfort / Services / Stability evidence. The card no longer displays visitor arrivals, star ratings, value percentiles, hover-only metrics, or frontend-invented verdicts such as `Strong Arbitrage`.
-
-`lib/ranking-explanations.ts` does not calculate a new score. It reads the actual Phase 7 multiplicative ranking effects already returned by the backend:
-
-- `structural_value_factor`
-- `basic_comfort_penalty`
-- `service_depth_penalty`
-- `stability_penalty`
-- `fx_opportunity_multiplier`
-
-It then identifies the largest observed tailwind and drag for explanatory display only. The backend remains the sole source of ranking order and score.
-
-Country imagery is no longer fetched for the entire ranking list. While the compatibility country modal remains in use, Pexels is requested only when a user opens a destination. Phase 5 will replace that modal with the full country-detail route.
+`ranking-explanations.ts` never calculates a new rank. It only explains the backend factors already returned by the production model.
 
 ### Phase 4 integrated discovery map
 
-Desktop Discover now uses a persistent two-column discovery surface rather than separate Results / Map tabs:
+Desktop Discover uses a synchronized map + ranking surface rather than separate map/results tabs. `WorldMap.tsx` retains the local GeoJSON and Equal Earth projection, uses a sequential Quality-Adjusted Value scale, and shares active-country state with `RankingList.tsx`.
+
+On smaller screens the ranking remains primary and the map opens in a full-screen overlay.
+
+### Phase 5 country detail
+
+The temporary `DestinationModal` has been removed. Selecting a destination now navigates to an addressable route such as:
 
 ```text
-components/discover/
-  RankingList.tsx
-  DestinationResult.tsx
-
-components/
-  WorldMap.tsx
+/country/JPN?origin=GBR&value=0.70&comfort=0.55&services=0.65&stability=0.75
 ```
 
-The map occupies the larger side of the desktop layout and remains visible while the ranked destination list scrolls independently. Hovering or keyboard-focusing a result highlights the same country on the map; hovering or focusing a map country highlights the matching result. Both sides use the same ISO3/country key and the backend's existing global value rank.
+The active preference configuration therefore survives country navigation, browser back/forward, refreshes, and shared URLs.
 
-`WorldMap.tsx` retains the local GeoJSON and Equal Earth projection, but now uses a calmer single-hue sequential Quality-Adjusted Value scale. Its tooltip exposes only production fields: global rank, value score, origin-relative purchasing power, and FX ranking effect. The map does not change meaning when the list is sorted by purchasing power or stability; map color always remains Quality-Adjusted Value.
+Country detail is composed from:
 
-On smaller screens the ranking remains primary. A Map button opens a full-screen discovery overlay, with Escape/close handling and body-scroll locking. Selecting a country from that map opens the existing country-detail compatibility modal.
+```text
+components/country/
+  CountryDetailClient.tsx
+  CountryHero.tsx
+  RankingDrivers.tsx
+  ValueSummary.tsx
+  LivingFoundations.tsx
+  EvidenceSummary.tsx
+```
+
+The page hierarchy is intentionally decision-first:
+
+1. headline rank / value / purchasing power / FX context;
+2. actual ranking tailwinds and drags;
+3. current purchasing power and currency timing;
+4. comfort, service depth, and political-stability foundations;
+5. city candidates;
+6. data confidence and explicit model limitations.
+
+The page explicitly states that furnished 30–90 day temporary housing is not modeled. Travel-to-destination cost and comprehensive personal-safety risk also remain outside the score. Legacy PPP-component cards, “similar profile” suggestions, “higher value” lists, and internal Phase labels are not part of the country experience.
+
+Country imagery is fetched only on the country page rather than across the ranking list. City Intelligence remains a second-stage country drill-down; its full consumer presentation is the focus of Frontend Phase 6.
 
 ## Commands
 
