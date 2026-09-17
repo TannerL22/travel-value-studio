@@ -36,6 +36,17 @@ def structural_purchasing_power_factor(value: object, cheapness_priority: float)
     return float(math.exp(elasticity * math.log(bounded)))
 
 
+def wgi_stability_score(value: object) -> Optional[float]:
+    """Map WGI Political Stability (-2.5 to +2.5) directly onto a 0-100 scale."""
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(numeric):
+        return None
+    return float(np.clip((numeric + 2.5) / 5.0, 0.0, 1.0) * 100.0)
+
+
 def _shortfall_penalty(
     score: object,
     requirement: float,
@@ -61,12 +72,10 @@ def _shortfall_penalty(
 
 
 def basic_comfort_penalty(score: object, requirement: float, coverage: float = 1.0) -> float:
-    # Preserve the Phase 3 threshold logic, but calculate it independently of the legacy score.
     return _shortfall_penalty(score, requirement, 55.0, 90.0, 1.5, coverage)
 
 
 def service_depth_penalty(score: object, requirement: float, coverage: float = 1.0) -> float:
-    # Preserve the Phase 4 threshold logic.
     return _shortfall_penalty(score, requirement, 35.0, 75.0, 1.2, coverage)
 
 
@@ -83,18 +92,24 @@ def apply_phase7_country_ranking(
     service_requirement: float,
     stability_priority: float,
 ) -> pd.DataFrame:
-    """Rebuild the country score from interpretable Phase 1-6 production evidence.
+    """Build the production country score from Phase 7.1 evidence only.
 
-    Legacy GDP-based score fields are retained for audit, but no longer drive the
-    production ordering.
+    Legacy diagnostics may be present as explicitly prefixed audit fields, but they
+    neither determine ordering nor country inclusion. The only Phase 7.1 eligibility
+    requirement at this step is a valid structural purchasing-power factor.
     """
     out = df.copy()
     origin_pp = float(origin_pp_multiplier) if origin_pp_multiplier and origin_pp_multiplier > 0 else 1.0
 
-    out["legacy_score_pre_phase7"] = pd.to_numeric(out.get("score"), errors="coerce")
-    out["legacy_component_overall_value_pre_phase7"] = pd.to_numeric(
-        out.get("component_overall_value"), errors="coerce"
-    )
+    # Backwards compatibility for direct unit tests or older callers: if explicitly
+    # prefixed audit fields were not attached upstream, copy any legacy score fields
+    # without using them in production calculations.
+    if "legacy_score_pre_phase7" not in out.columns:
+        out["legacy_score_pre_phase7"] = pd.to_numeric(out.get("score"), errors="coerce")
+    if "legacy_component_overall_value_pre_phase7" not in out.columns:
+        out["legacy_component_overall_value_pre_phase7"] = pd.to_numeric(
+            out.get("component_overall_value"), errors="coerce"
+        )
 
     tpp = pd.to_numeric(out.get("tourism_pp_power"), errors="coerce")
     out["structural_purchasing_power"] = tpp / origin_pp
@@ -118,12 +133,20 @@ def apply_phase7_country_ranking(
         for score, cov in zip(service, service_cov)
     ]
 
-    stability = pd.to_numeric(out.get("component_safety_stability"), errors="coerce")
-    stability_evidence = pd.to_numeric(out.get("wgi_political_stability"), errors="coerce").notna().astype(float)
-    out["stability_evidence_coverage"] = stability_evidence
+    # Phase 7.1 removes the legacy blended safety component from production stability.
+    # WGI Political Stability is converted directly; missing WGI means zero evidence
+    # coverage and therefore an exactly neutral stability penalty.
+    wgi = pd.to_numeric(out.get("wgi_political_stability"), errors="coerce")
+    out["component_safety_stability"] = wgi.map(wgi_stability_score)
+    out["stability_source"] = np.where(
+        wgi.notna(),
+        "world_bank_wgi_political_stability",
+        "unavailable_neutral",
+    )
+    out["stability_evidence_coverage"] = wgi.notna().astype(float)
     out["stability_penalty"] = [
         stability_penalty(score, stability_priority, cov)
-        for score, cov in zip(stability, stability_evidence)
+        for score, cov in zip(out["component_safety_stability"], out["stability_evidence_coverage"])
     ]
 
     out["score_pre_fx_opportunity"] = (
@@ -133,7 +156,13 @@ def apply_phase7_country_ranking(
         * pd.to_numeric(out["stability_penalty"], errors="coerce")
     )
     out["score"] = out["score_pre_fx_opportunity"]
-    out = out.dropna(subset=["score"]).sort_values("score", ascending=False).reset_index(drop=True)
+    out["phase71_scoreable"] = pd.to_numeric(out["score"], errors="coerce").notna()
+    out["phase71_exclusion_reason"] = np.where(
+        out["phase71_scoreable"],
+        "",
+        "missing_structural_purchasing_power",
+    )
+    out = out[out["phase71_scoreable"]].sort_values("score", ascending=False).reset_index(drop=True)
 
     maximum = out["score"].max()
     out["component_overall_value"] = (
