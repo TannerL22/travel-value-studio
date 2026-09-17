@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -14,11 +13,9 @@ import { ValueSummary } from "@/components/country/ValueSummary";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrigins } from "@/hooks/useOrigins";
 import { useRankings } from "@/hooks/useRankings";
-import { parsePreferences } from "@/lib/preferences";
+import { parsePreferences, preferenceLevel } from "@/lib/preferences";
 
-export function CountryDetailClient({ iso3 }: { iso3: string }) {
-  const searchParams = useSearchParams();
-  const queryString = searchParams.toString();
+export function CountryDetailClient({ iso3, queryString }: { iso3: string; queryString: string }) {
   const filters = useMemo(() => parsePreferences(new URLSearchParams(queryString)), [queryString]);
   const { origins } = useOrigins();
   const { results, loading, error } = useRankings(filters, true);
@@ -45,7 +42,7 @@ export function CountryDetailClient({ iso3 }: { iso3: string }) {
     return () => controller.abort();
   }, [country]);
 
-  if (loading && results.length === 0) return <CountryDetailSkeleton />;
+  if ((loading || results.length === 0) && !error && !country) return <CountryDetailSkeleton />;
 
   if (error) {
     return (
@@ -74,10 +71,10 @@ export function CountryDetailClient({ iso3 }: { iso3: string }) {
       <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4 sm:px-6">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-500">
           <span><strong className="font-medium text-zinc-300">Reference:</strong> {referenceLabel}</span>
-          <span><strong className="font-medium text-zinc-300">Value priority:</strong> {Math.round(filters.budget_sens * 100)}%</span>
-          <span><strong className="font-medium text-zinc-300">Comfort:</strong> {Math.round(filters.comfort * 100)}%</span>
-          <span><strong className="font-medium text-zinc-300">Services:</strong> {Math.round(filters.supply_need * 100)}%</span>
-          <span><strong className="font-medium text-zinc-300">Stability:</strong> {Math.round(filters.risk_pri * 100)}%</span>
+          <span><strong className="font-medium text-zinc-300">Value:</strong> {preferenceLevel("budget_sens", filters.budget_sens)}</span>
+          <span><strong className="font-medium text-zinc-300">Comfort:</strong> {preferenceLevel("comfort", filters.comfort)}</span>
+          <span><strong className="font-medium text-zinc-300">Services:</strong> {preferenceLevel("supply_need", filters.supply_need)}</span>
+          <span><strong className="font-medium text-zinc-300">Stability:</strong> {preferenceLevel("risk_pri", filters.risk_pri)}</span>
         </div>
       </div>
 
