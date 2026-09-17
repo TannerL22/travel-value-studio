@@ -65,7 +65,7 @@ export function ControlPanel({ values, setValues, origins }: ControlPanelProps) 
                     </button>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs border border-white/10 bg-zinc-950/90 text-xs text-zinc-100">
-                    Select the country whose primary currency you hold or earn. The model uses it for relative purchasing power and origin-aware FX diagnostics.
+                    Select the country whose primary currency you hold or earn. Phase 2 uses that currency for bilateral 1W, 1M, 3M, 1Y, and 3Y FX opportunity signals as well as relative purchasing power.
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -123,7 +123,7 @@ export function ControlPanel({ values, setValues, origins }: ControlPanelProps) 
                       </button>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs border border-white/10 bg-zinc-950/90 text-xs text-zinc-100">
-                      Higher = more strongly penalize destinations where low prices may reflect weak development or basic services. Phase 1 still uses a GDP-PPP proxy; dedicated services data comes later.
+                      Higher = more strongly penalize destinations where low prices may reflect weak development or basic services. The current model still uses a GDP-PPP proxy; dedicated services data arrives in Phase 3.
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -143,7 +143,7 @@ export function ControlPanel({ values, setValues, origins }: ControlPanelProps) 
                       </button>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs border border-white/10 bg-zinc-950/90 text-xs text-zinc-100">
-                      Higher = prefer destinations where cheapness is easier to convert into usable services and established visitor infrastructure. Phase 1 still relies mainly on international arrivals as a proxy.
+                      Higher = prefer destinations where cheapness is easier to convert into usable services and established visitor infrastructure. The current model still relies mainly on international arrivals as a proxy.
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -175,7 +175,7 @@ export function ControlPanel({ values, setValues, origins }: ControlPanelProps) 
 
           <section className="mt-auto border-t border-white/10 pt-4">
             <p className="text-[10px] leading-4 text-zinc-500">
-              Phase 1 keeps the existing ranking formula but removes the artificial home-daily-spend anchor and relabels proxies according to what they actually measure.
+              Phase 2 adds live bilateral FX timing to the production ranking. The timing overlay is capped so currency moves can matter without overwhelming structural purchasing power and your quality preferences.
             </p>
           </section>
         </div>
