@@ -99,7 +99,7 @@ export function ControlPanel({ values, setValues, origins }: ControlPanelProps) 
           </section>
 
           <section className="mt-auto border-t border-white/10 pt-4">
-            <p className="text-[10px] leading-4 text-zinc-500">Phase 5 adds a city-level amenity drill-down after the country screen. City POI density currently helps you choose within a country but does not alter the national ranking; Phase 6 will add mobility and digital convenience.</p>
+            <p className="text-[10px] leading-4 text-zinc-500">Phase 6 adds Mobility and Digital Convenience to the city drill-down. They are diagnostics only for now—no extra sliders and no hidden ranking weight until Phase 7 validates how these fields behave across markets.</p>
           </section>
         </div>
       </TooltipProvider>
