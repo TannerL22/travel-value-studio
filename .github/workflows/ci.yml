@@ -19,8 +19,7 @@ jobs:
       - name: Compile backend
         run: python -m py_compile backend/main.py backend/data_sources.py backend/source_registry.py backend/model_contract.py
       - name: Run backend sanity checks
-        working-directory: backend
-        run: python sanity_checks.py
+        run: python backend/sanity_checks.py
 
   frontend:
     runs-on: ubuntu-latest
