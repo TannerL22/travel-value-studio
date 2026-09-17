@@ -1,0 +1,29 @@
+name: Phase 7.1 Empirical Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/phase71-audit.yml'
+      - 'backend/phase71_empirical_audit.py'
+      - 'backend/production_ranking.py'
+      - 'backend/ranking_v7.py'
+      - 'backend/basic_comfort.py'
+      - 'backend/service_depth.py'
+      - 'backend/fx_opportunity.py'
+      - 'backend/data_sources.py'
+
+jobs:
+  empirical-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Run live Phase 7.1 empirical and control audit
+        run: python backend/phase71_empirical_audit.py
