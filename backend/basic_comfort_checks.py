@@ -123,7 +123,9 @@ def test_high_comfort_requirement_can_change_order() -> None:
     ranked = apply_basic_comfort_to_ranking(frame, comfort_requirement=1.0)
     assert ranked.iloc[0]["country"] == "Slightly pricier strong services"
     assert ranked.iloc[0]["basic_comfort_penalty"] == 1.0
-    assert ranked.iloc[1]["basic_comfort_penalty"] < 0.2
+    # The smoother Phase 7.1 curve is still severe enough to reverse the order, but
+    # no longer requires the old sub-0.20 cliff at a comfort score of 35.
+    assert ranked.iloc[1]["basic_comfort_penalty"] < 0.30
 
 
 def main() -> None:
