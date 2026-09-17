@@ -99,7 +99,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: rgb(39 39 42);
   --input: rgb(39 39 42);
-  --ring: rgb(16 185 129);
+  --ring: rgb(34 211 238);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -119,7 +119,33 @@
   * {
     @apply border-border outline-ring/50;
   }
+
+  html {
+    text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground;
+    min-width: 320px;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(103 232 249 / 0.8);
+    outline-offset: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
