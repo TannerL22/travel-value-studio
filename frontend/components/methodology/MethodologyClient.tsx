@@ -21,8 +21,13 @@ export function MethodologyClient({ queryString }: { queryString: string }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError(null);
+    let active = true;
+
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      setLoading(true);
+      setError(null);
+    });
 
     Promise.all([
       fetch(apiUrl("/api/methodology"), { signal: controller.signal }).then(async (response) => {
@@ -35,18 +40,22 @@ export function MethodologyClient({ queryString }: { queryString: string }) {
       }),
     ])
       .then(([methodologyData, registryData]) => {
+        if (!active) return;
         setMethodology(methodologyData);
         setSourceRegistry(registryData);
       })
       .catch((fetchError: unknown) => {
-        if ((fetchError as { name?: string })?.name === "AbortError") return;
+        if (!active || (fetchError as { name?: string })?.name === "AbortError") return;
         setError(fetchError instanceof Error ? fetchError : new Error("Failed to load methodology"));
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (active) setLoading(false);
       });
 
-    return () => controller.abort();
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, []);
 
   return (
