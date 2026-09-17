@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from typing import Dict
 
+from babel.numbers import get_territory_currencies
 import numpy as np
 import pandas as pd
+import pycountry
 
 from basic_comfort import add_basic_comfort_v3
 from country_universe import filter_production_country_universe, is_production_country_iso3
@@ -52,40 +54,70 @@ LEGACY_AUDIT_FIELDS = {
 }
 
 
-def repair_country_currencies(df: pd.DataFrame) -> pd.DataFrame:
-    """Fill ISO currency codes for the production economy universe.
+def _babel_currency_map(iso3_codes: list[str]) -> Dict[str, str]:
+    """Resolve current tender currency from ISO territory metadata without network I/O."""
+    mapping: Dict[str, str] = {}
+    for code in iso3_codes:
+        upper = str(code).upper()
+        if upper in SPECIAL_CURRENCY_OVERRIDES:
+            mapping[upper] = SPECIAL_CURRENCY_OVERRIDES[upper]
+            continue
+        country = pycountry.countries.get(alpha_3=upper)
+        if country is None:
+            continue
+        currencies = get_territory_currencies(country.alpha_2, tender=True)
+        if currencies:
+            mapping[upper] = str(currencies[0]).upper()
+    return mapping
 
-    The raw dataset can lose the entire RestCountries mapping when World Bank
-    aggregate codes are sent to the batch endpoint. Phase 7.1 filters aggregates
-    first, then retries mapping only real economies and applies explicit overrides
-    for user-assigned/supplemental economies.
+
+def repair_country_currencies(df: pd.DataFrame) -> pd.DataFrame:
+    """Fill current ISO currency codes for the production economy universe.
+
+    Phase 7.1 uses local ISO territory/currency metadata as the primary mapping so a
+    third-party country API outage cannot disable FX Opportunity globally. Existing
+    raw currency data is preserved. RestCountries remains a best-effort fallback only
+    for any ISO economies Babel cannot resolve.
     """
     out = filter_production_country_universe(df)
     if "currency" not in out.columns:
         out["currency"] = np.nan
 
     existing = out["currency"].copy()
-    codes = [
+    codes = sorted({
         str(code).upper()
         for code in out["iso3"].dropna().tolist()
-        if is_production_country_iso3(code) and str(code).upper() not in SPECIAL_CURRENCY_OVERRIDES
-    ]
-    warning = ""
-    mapping: Dict[str, str] = {}
-    try:
-        mapping = fetch_country_currency_map(sorted(set(codes)))
-    except Exception as exc:
-        warning = f"country_currency_mapping_failed:{type(exc).__name__}"
+        if is_production_country_iso3(code)
+    })
+    mapping = _babel_currency_map(codes)
+    fallback_warning = ""
+    missing_codes = [code for code in codes if code not in mapping]
+    if missing_codes:
+        try:
+            mapping.update(fetch_country_currency_map(missing_codes))
+        except Exception as exc:
+            fallback_warning = f"country_currency_network_fallback_failed:{type(exc).__name__}"
 
     mapping.update(SPECIAL_CURRENCY_OVERRIDES)
     repaired = out["iso3"].astype(str).str.upper().map(mapping)
     out["currency"] = existing.combine_first(repaired)
-    out["currency_mapping_source"] = np.where(
+
+    source_values = []
+    for had_existing, code, repaired_value in zip(
         existing.notna(),
-        "raw_dataset",
-        np.where(repaired.notna(), "country_reference_repair", "unavailable"),
-    )
-    out["currency_mapping_warning"] = warning
+        out["iso3"].astype(str).str.upper(),
+        repaired,
+    ):
+        if had_existing:
+            source_values.append("raw_dataset")
+        elif pd.notna(repaired_value):
+            source_values.append("iso_territory_currency_metadata")
+        elif code in SPECIAL_CURRENCY_OVERRIDES:
+            source_values.append("explicit_override")
+        else:
+            source_values.append("unavailable")
+    out["currency_mapping_source"] = source_values
+    out["currency_mapping_warning"] = fallback_warning
     return out
 
 
