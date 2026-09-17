@@ -1,45 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Building2, Gauge, Loader2, MapPin, TrainFront, Wifi } from "lucide-react";
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
-
-type CityRow = {
-  city_id?: string | null;
-  city_name?: string | null;
-  population?: number | null;
-  area_km2?: number | null;
-  amenity_depth?: number | null;
-  amenity_rank_within_country?: number | null;
-  amenity_total_per_10k?: number | null;
-  amenity_food_drink_score?: number | null;
-  amenity_shopping_score?: number | null;
-  amenity_health_care_score?: number | null;
-  amenity_recreation_culture_score?: number | null;
-  amenity_lifestyle_services_score?: number | null;
-  amenity_lodging_score?: number | null;
-  amenity_source?: string | null;
-  amenity_query_success?: boolean | null;
-  mobility?: number | null;
-  mobility_gtfs_feed_count?: number | null;
-  mobility_gtfs_official_feed_count?: number | null;
-  mobility_gtfs_evidence?: string | null;
-  digital_convenience?: number | null;
-  digital_convenience_coverage?: number | null;
-  city_usability?: number | null;
-  city_usability_coverage?: number | null;
-  city_usability_rank_within_country?: number | null;
-};
-
-type CityResponse = {
-  meta?: {
-    amenity_score_status?: string | null;
-    mobility_catalog_warning?: string | null;
-    phase6_country_source_warning?: string | null;
-  };
-  results?: CityRow[];
-};
+import { useCities } from "@/hooks/useCities";
+import type { CityRow } from "@/lib/types";
 
 type CityIntelligencePanelProps = { iso3?: string | null };
 
@@ -54,26 +18,7 @@ const scoreLabel = (value: number | null | undefined) => {
 };
 
 export function CityIntelligencePanel({ iso3 }: CityIntelligencePanelProps) {
-  const [cities, setCities] = useState<CityRow[]>([]);
-  const [meta, setMeta] = useState<CityResponse["meta"] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (!iso3) return;
-    const controller = new AbortController();
-    void Promise.resolve().then(() => {
-      if (controller.signal.aborted) return;
-      setLoading(true); setFailed(false); setCities([]); setMeta(null);
-    });
-    fetch(`${API_BASE_URL}/api/cities/${encodeURIComponent(iso3)}?limit=6&include_amenities=1&include_usability=1`, { signal: controller.signal })
-      .then((response) => { if (!response.ok) throw new Error("City intelligence request failed"); return response.json() as Promise<CityResponse>; })
-      .then((data) => { setCities(data.results ?? []); setMeta(data.meta ?? null); })
-      .catch((error: { name?: string }) => { if (error?.name !== "AbortError") setFailed(true); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
-  }, [iso3]);
-
+  const { cities, meta, loading, error } = useCities(iso3);
   if (!iso3) return null;
 
   const categoryRows = (city: CityRow) => [
@@ -81,6 +26,7 @@ export function CityIntelligencePanel({ iso3 }: CityIntelligencePanelProps) {
     ["Health", city.amenity_health_care_score], ["Leisure", city.amenity_recreation_culture_score],
     ["Lifestyle", city.amenity_lifestyle_services_score], ["Stay", city.amenity_lodging_score],
   ] as const;
+  const amenityStatus = typeof meta.amenity_score_status === "string" ? meta.amenity_score_status : null;
 
   return (
     <div className="mb-7 rounded-xl border border-amber-400/10 bg-amber-400/5 p-4">
@@ -94,7 +40,7 @@ export function CityIntelligencePanel({ iso3 }: CityIntelligencePanelProps) {
 
       {loading ? (
         <div className="mt-4 flex items-center gap-2 rounded-lg border border-white/5 bg-white/5 p-4 text-xs text-zinc-400"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading city usability evidence…</div>
-      ) : failed ? (
+      ) : error ? (
         <div className="mt-4 rounded-lg border border-white/5 bg-white/5 p-4 text-xs leading-5 text-zinc-400">City evidence is currently unavailable. Missing evidence does not reduce the country ranking.</div>
       ) : cities.length === 0 ? (
         <div className="mt-4 rounded-lg border border-white/5 bg-white/5 p-4 text-xs leading-5 text-zinc-400">No harmonized city match is currently available for this country.</div>
@@ -113,9 +59,9 @@ export function CityIntelligencePanel({ iso3 }: CityIntelligencePanelProps) {
                   <div className="shrink-0 text-right"><p className="text-[9px] uppercase tracking-[0.12em] text-zinc-500">City usability</p><p className="text-lg font-semibold text-white">{scoreLabel(city.city_usability)}</p><p className="text-[8px] text-zinc-600">{city.city_usability_coverage != null ? `${Math.round(city.city_usability_coverage * 100)}% evidence` : "coverage N/A"}</p></div>
                 </div>
 
-                {observed ? <div className="mt-3 grid grid-cols-6 gap-1">{categoryRows(city).map(([label, score]) => <div key={label} className="rounded bg-white/5 px-1.5 py-1.5 text-center"><p className="text-[8px] uppercase tracking-[0.08em] text-zinc-500">{label}</p><p className="mt-0.5 text-[10px] font-medium text-zinc-200">{scoreLabel(score)}</p></div>)}</div> : <p className="mt-2 text-[10px] leading-4 text-zinc-500">Amenity evidence unavailable — City Usability is intentionally unavailable rather than inferred from national context.</p>}
+                {observed ? <div className="mt-3 grid grid-cols-3 gap-1 sm:grid-cols-6">{categoryRows(city).map(([label, score]) => <div key={label} className="rounded bg-white/5 px-1.5 py-1.5 text-center"><p className="text-[8px] uppercase tracking-[0.08em] text-zinc-500">{label}</p><p className="mt-0.5 text-[10px] font-medium text-zinc-200">{scoreLabel(score)}</p></div>)}</div> : <p className="mt-2 text-[10px] leading-4 text-zinc-500">Amenity evidence unavailable — City Usability is intentionally unavailable rather than inferred from national context.</p>}
 
-                <div className="mt-3 grid grid-cols-4 gap-2 border-t border-white/5 pt-3">
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/5 pt-3 sm:grid-cols-4">
                   <div className="rounded-md bg-white/[0.03] p-2"><div className="flex items-center gap-1.5 text-[8px] uppercase tracking-[0.1em] text-zinc-500"><Gauge className="h-3 w-3" /> Amenity</div><p className="mt-1 text-sm font-semibold text-zinc-100">{scoreLabel(city.amenity_depth)}</p><p className="mt-0.5 text-[8px] text-zinc-600">60% usability weight</p></div>
                   <div className="rounded-md bg-white/[0.03] p-2"><div className="flex items-center gap-1.5 text-[8px] uppercase tracking-[0.1em] text-zinc-500"><TrainFront className="h-3 w-3" /> Mobility</div><p className="mt-1 text-sm font-semibold text-zinc-100">{scoreLabel(city.mobility)}</p><p className="mt-0.5 text-[8px] text-zinc-600">20% · country baseline</p></div>
                   <div className="rounded-md bg-white/[0.03] p-2"><div className="flex items-center gap-1.5 text-[8px] uppercase tracking-[0.1em] text-zinc-500"><Wifi className="h-3 w-3" /> Digital</div><p className="mt-1 text-sm font-semibold text-zinc-100">{scoreLabel(city.digital_convenience)}</p><p className="mt-0.5 text-[8px] text-zinc-600">20% · connectivity + payments</p></div>
@@ -127,7 +73,7 @@ export function CityIntelligencePanel({ iso3 }: CityIntelligencePanelProps) {
         </div>
       )}
 
-      <div className="mt-3 flex items-start gap-2 text-[10px] leading-4 text-zinc-500"><Building2 className="mt-0.5 h-3 w-3 shrink-0" /><p>Phase 7 City Usability is a coverage-aware geometric blend of Amenity Depth (60%), Mobility (20%) and Digital Convenience (20%). Amenity evidence is required because Mobility/Digital are still mainly national context. It helps order returned city candidates but is not a global city-value score and never changes the country Quality-Adjusted Value{meta?.amenity_score_status ? ` — ${meta.amenity_score_status}` : ""}.</p></div>
+      <div className="mt-3 flex items-start gap-2 text-[10px] leading-4 text-zinc-500"><Building2 className="mt-0.5 h-3 w-3 shrink-0" /><p>Phase 7 City Usability is a coverage-aware geometric blend of Amenity Depth (60%), Mobility (20%) and Digital Convenience (20%). Amenity evidence is required because Mobility/Digital are still mainly national context. It helps order returned city candidates but is not a global city-value score and never changes the country Quality-Adjusted Value{amenityStatus ? ` — ${amenityStatus}` : ""}.</p></div>
     </div>
   );
 }
