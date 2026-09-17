@@ -99,7 +99,7 @@ export function DestinationCard({ country, index, onClick }: DestinationCardProp
                 <div className="flex items-center gap-2">
                   <Users className="h-3.5 w-3.5 text-zinc-400" />
                   <div className="flex flex-col">
-                    <span className="text-[9px] uppercase tracking-tight text-zinc-500">Arrivals proxy</span>
+                    <span className="text-[9px] uppercase tracking-tight text-zinc-500">Visitor arrivals</span>
                     <span className="text-xs font-medium text-white">{formatArrivals(country.arrivals)}</span>
                   </div>
                 </div>
