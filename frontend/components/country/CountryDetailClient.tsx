@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-import { CityIntelligencePanel } from "@/components/CityIntelligencePanel";
+import { CityShortlist } from "@/components/country/CityShortlist";
 import { CountryHero } from "@/components/country/CountryHero";
 import { EvidenceSummary } from "@/components/country/EvidenceSummary";
 import { LivingFoundations } from "@/components/country/LivingFoundations";
@@ -84,11 +84,11 @@ export function CountryDetailClient({ iso3, queryString }: { iso3: string; query
 
       <section>
         <SectionHeading
-          eyebrow="Best city candidates"
+          eyebrow="City shortlist"
           title="Which major cities are worth investigating first"
-          description="City intelligence is a second-stage shortlist. It helps compare major-city usability inside this country but does not alter the country value score."
+          description="City Usability helps order the returned major-city candidates using observed amenity depth plus supporting national mobility and digital context. It does not alter the country value score."
         />
-        <div className="mt-5"><CityIntelligencePanel iso3={country.iso3} /></div>
+        <div className="mt-5"><CityShortlist iso3={country.iso3} /></div>
       </section>
 
       <EvidenceSummary country={country} />
