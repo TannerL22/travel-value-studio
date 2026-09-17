@@ -12,9 +12,9 @@ import requests
 
 WDI_API = "https://api.worldbank.org/v2"
 COMFORT_CACHE_TTL_SECONDS = int(os.getenv("BASIC_COMFORT_CACHE_TTL_SECONDS", "43200"))
+LEGACY_GDP_FALLBACK_FLOOR = 12_000.0
+LEGACY_GDP_FALLBACK_STRENGTH = 2.0
 
-# Direct basic-service indicators. Safely managed water/sanitation are preferred;
-# at-least-basic series are explicit fallbacks when the stricter series is absent.
 INDICATORS: Dict[str, str] = {
     "comfort_water_safe_pct": "SH.H2O.SMDW.ZS",
     "comfort_water_basic_pct": "SH.H2O.BASW.ZS",
@@ -25,9 +25,6 @@ INDICATORS: Dict[str, str] = {
     "comfort_uhc_index": "SH.UHC.SRVS.CV.XD",
 }
 
-# Pillar weights deliberately sum to one. These are a model choice rather than
-# empirical facts; water/sanitation/electricity/health are treated as essentials,
-# with internet carrying a smaller but still material role for a 1-3 month stay.
 PILLAR_WEIGHTS = {
     "water": 0.25,
     "sanitation": 0.20,
@@ -36,9 +33,6 @@ PILLAR_WEIGHTS = {
     "health": 0.20,
 }
 
-# (floor, target): below floor -> 0; target and above -> 1. The saturation is
-# intentional: Denmark should not keep beating Japan because an already-good
-# service measure is fractionally higher.
 PILLAR_THRESHOLDS = {
     "water": (50.0, 95.0),
     "sanitation": (45.0, 90.0),
@@ -136,20 +130,24 @@ def saturating_service_score(value: object, floor: float, target: float) -> Opti
     return float(np.clip((number - floor) / (target - floor), 0.0, 1.0))
 
 
-def _select_service(
-    preferred: object,
-    fallback: object,
-    floor: float,
-    target: float,
-) -> Tuple[Optional[float], float, str]:
+def _legacy_gdp_comfort(value: object) -> float:
+    """Preference-independent fallback retained only for missing direct evidence."""
+    try:
+        gdp_ppp = float(value)
+    except (TypeError, ValueError):
+        return 0.5
+    if not np.isfinite(gdp_ppp) or gdp_ppp <= 0:
+        return 0.5
+    ratio = max(0.0, gdp_ppp / LEGACY_GDP_FALLBACK_FLOOR)
+    return float(np.clip(min(1.0, ratio) ** LEGACY_GDP_FALLBACK_STRENGTH, 0.0, 1.0))
+
+
+def _select_service(preferred: object, fallback: object, floor: float, target: float) -> Tuple[Optional[float], float, str]:
     preferred_score = saturating_service_score(preferred, floor, target)
     if preferred_score is not None:
         return preferred_score, 1.0, "preferred"
-
     fallback_score = saturating_service_score(fallback, floor, target)
     if fallback_score is not None:
-        # "At least basic" access is useful evidence but is not equivalent to
-        # safely managed service. Cap and down-weight the fallback explicitly.
         return min(fallback_score, 0.88), 0.75, "basic_fallback"
     return None, 0.0, "missing"
 
@@ -167,7 +165,6 @@ def _weighted_geometric(values: Dict[str, Optional[float]], reliability: Dict[st
         effective_weight = base_weight * rel
         numerator += effective_weight * math.log(max(float(value), 0.01))
         denominator += effective_weight
-
     if denominator <= 0:
         return None, 0.0
     direct = math.exp(numerator / denominator)
@@ -175,7 +172,7 @@ def _weighted_geometric(values: Dict[str, Optional[float]], reliability: Dict[st
 
 
 def add_basic_comfort_v3(df: pd.DataFrame, target_year: int) -> pd.DataFrame:
-    """Attach direct basic-service metrics and a coverage-aware comfort score."""
+    """Attach direct basic-service metrics and an objective, coverage-aware comfort score."""
     out = df.copy()
     comfort_frame, warnings = fetch_basic_comfort_frame(target_year)
     if not comfort_frame.empty:
@@ -185,9 +182,12 @@ def add_basic_comfort_v3(df: pd.DataFrame, target_year: int) -> pd.DataFrame:
             out[field_name] = np.nan
             out[f"{field_name}_year"] = np.nan
 
-    out["legacy_basic_comfort"] = pd.to_numeric(
+    out["legacy_request_comfort_component"] = pd.to_numeric(
         out.get("component_comfort_floor", pd.Series(np.nan, index=out.index)), errors="coerce"
     )
+    out["legacy_basic_comfort"] = pd.to_numeric(
+        out.get("gdp_ppp_pc_int", pd.Series(np.nan, index=out.index)), errors="coerce"
+    ).map(lambda value: round(_legacy_gdp_comfort(value) * 100.0, 2))
 
     water_scores = []
     sanitation_scores = []
@@ -202,32 +202,16 @@ def add_basic_comfort_v3(df: pd.DataFrame, target_year: int) -> pd.DataFrame:
 
     for _, row in out.iterrows():
         water, water_rel, water_source = _select_service(
-            row.get("comfort_water_safe_pct"),
-            row.get("comfort_water_basic_pct"),
-            *PILLAR_THRESHOLDS["water"],
+            row.get("comfort_water_safe_pct"), row.get("comfort_water_basic_pct"), *PILLAR_THRESHOLDS["water"]
         )
         sanitation, sanitation_rel, sanitation_source = _select_service(
-            row.get("comfort_sanitation_safe_pct"),
-            row.get("comfort_sanitation_basic_pct"),
-            *PILLAR_THRESHOLDS["sanitation"],
+            row.get("comfort_sanitation_safe_pct"), row.get("comfort_sanitation_basic_pct"), *PILLAR_THRESHOLDS["sanitation"]
         )
-        electricity = saturating_service_score(
-            row.get("comfort_electricity_pct"), *PILLAR_THRESHOLDS["electricity"]
-        )
-        internet = saturating_service_score(
-            row.get("comfort_internet_pct"), *PILLAR_THRESHOLDS["internet"]
-        )
-        health = saturating_service_score(
-            row.get("comfort_uhc_index"), *PILLAR_THRESHOLDS["health"]
-        )
+        electricity = saturating_service_score(row.get("comfort_electricity_pct"), *PILLAR_THRESHOLDS["electricity"])
+        internet = saturating_service_score(row.get("comfort_internet_pct"), *PILLAR_THRESHOLDS["internet"])
+        health = saturating_service_score(row.get("comfort_uhc_index"), *PILLAR_THRESHOLDS["health"])
 
-        values = {
-            "water": water,
-            "sanitation": sanitation,
-            "electricity": electricity,
-            "internet": internet,
-            "health": health,
-        }
+        values = {"water": water, "sanitation": sanitation, "electricity": electricity, "internet": internet, "health": health}
         reliability = {
             "water": water_rel,
             "sanitation": sanitation_rel,
@@ -236,15 +220,7 @@ def add_basic_comfort_v3(df: pd.DataFrame, target_year: int) -> pd.DataFrame:
             "health": 1.0 if health is not None else 0.0,
         }
         direct, coverage = _weighted_geometric(values, reliability)
-
-        legacy = row.get("component_comfort_floor")
-        try:
-            legacy_01 = float(legacy) / 100.0
-            if not np.isfinite(legacy_01):
-                legacy_01 = 0.5
-        except (TypeError, ValueError):
-            legacy_01 = 0.5
-        legacy_01 = float(np.clip(legacy_01, 0.0, 1.0))
+        legacy_01 = float(np.clip(_legacy_gdp_comfort(row.get("gdp_ppp_pc_int")), 0.0, 1.0))
 
         if direct is None:
             final = legacy_01
@@ -254,21 +230,14 @@ def add_basic_comfort_v3(df: pd.DataFrame, target_year: int) -> pd.DataFrame:
             source = "direct_services" if coverage >= 0.95 else "blended_direct_legacy"
 
         flags = []
-        if water_source == "basic_fallback":
-            flags.append("water_basic_fallback")
-        elif water_source == "missing":
-            flags.append("missing_water")
-        if sanitation_source == "basic_fallback":
-            flags.append("sanitation_basic_fallback")
-        elif sanitation_source == "missing":
-            flags.append("missing_sanitation")
+        if water_source == "basic_fallback": flags.append("water_basic_fallback")
+        elif water_source == "missing": flags.append("missing_water")
+        if sanitation_source == "basic_fallback": flags.append("sanitation_basic_fallback")
+        elif sanitation_source == "missing": flags.append("missing_sanitation")
         for pillar, value in [("electricity", electricity), ("internet", internet), ("health", health)]:
-            if value is None:
-                flags.append(f"missing_{pillar}")
-        if source == "legacy_gdp_ppp_fallback":
-            flags.append("comfort_legacy_fallback")
-        if warnings:
-            flags.append("comfort_source_warning")
+            if value is None: flags.append(f"missing_{pillar}")
+        if source == "legacy_gdp_ppp_fallback": flags.append("comfort_legacy_fallback")
+        if warnings: flags.append("comfort_source_warning")
 
         water_scores.append(None if water is None else round(water * 100.0, 2))
         sanitation_scores.append(None if sanitation is None else round(sanitation * 100.0, 2))
@@ -298,7 +267,7 @@ def add_basic_comfort_v3(df: pd.DataFrame, target_year: int) -> pd.DataFrame:
 
 
 def apply_basic_comfort_to_ranking(df: pd.DataFrame, comfort_requirement: float) -> pd.DataFrame:
-    """Replace the legacy GDP-PPP floor with the direct Phase 3 comfort penalty."""
+    """Apply user preference only after the objective Phase 3 comfort score exists."""
     out = df.copy()
     requirement = float(np.clip(comfort_requirement, 0.0, 1.0))
     threshold = 55.0 + 35.0 * requirement
@@ -313,9 +282,6 @@ def apply_basic_comfort_to_ranking(df: pd.DataFrame, comfort_requirement: float)
     out["basic_comfort_penalty"] = penalty
     out["score_floor_penalty"] = penalty
 
-    # Reconstruct the production score without the legacy GDP comfort floor so
-    # countries are not double-penalized. The component columns are generated by
-    # compute_scores before this Phase 3 overlay.
     base = pd.to_numeric(out.get("score_base"), errors="coerce")
     cost = pd.to_numeric(out.get("score_tourism_cost"), errors="coerce")
     infra = pd.to_numeric(out.get("score_infra"), errors="coerce")
