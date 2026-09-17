@@ -8,6 +8,7 @@ type CountryHeroProps = {
   country: RankingRow;
   backHref: string;
   compareHref: string;
+  methodologyHref: string;
   imageUrl?: string | null;
   referenceLabel: string;
 };
@@ -15,7 +16,7 @@ type CountryHeroProps = {
 const score = (country: RankingRow) => country.quality_adjusted_value ?? country.Score ?? country.score ?? null;
 const purchasingPower = (country: RankingRow) => country.structural_purchasing_power ?? country.value_multiplier_relative ?? null;
 
-export function CountryHero({ country, backHref, compareHref, imageUrl, referenceLabel }: CountryHeroProps) {
+export function CountryHero({ country, backHref, compareHref, methodologyHref, imageUrl, referenceLabel }: CountryHeroProps) {
   const name = country.country ?? country.iso3 ?? "Unknown destination";
   const valueScore = score(country);
   const pp = purchasingPower(country);
@@ -60,7 +61,7 @@ export function CountryHero({ country, backHref, compareHref, imageUrl, referenc
           <div className="absolute bottom-5 left-5 right-5 rounded-2xl border border-white/10 bg-zinc-950/70 p-4 backdrop-blur-md">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Important scope note</p>
             <p className="mt-2 text-sm leading-5 text-zinc-300">Temporary furnished housing for 30–90 day stays is not yet modeled.</p>
-            <Link href="/methodology" className="mt-3 inline-flex items-center gap-1.5 text-xs text-cyan-300 hover:text-cyan-200">
+            <Link href={methodologyHref} className="mt-3 inline-flex items-center gap-1.5 text-xs text-cyan-300 hover:text-cyan-200">
               Model scope <ExternalLink className="h-3 w-3" />
             </Link>
           </div>
