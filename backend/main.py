@@ -26,7 +26,11 @@ from fx_opportunity import (
 )
 from model_contract import phase_4_methodology
 from phase4_registry import get_phase4_source_registry
-from service_depth import add_service_depth_v4, apply_service_depth_to_ranking
+from service_depth import (
+    add_service_depth_v4,
+    align_data_quality_with_service_depth,
+    apply_service_depth_to_ranking,
+)
 from source_registry import get_methodology_summary
 
 
@@ -153,6 +157,7 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     # Phase 4: supply-side Service Depth. WEF TTDI Tourist Services is preferred;
     # arrivals per resident survive only as a capped, low-confidence fallback.
     scored = add_service_depth_v4(scored, target_year=query.year)
+    scored = align_data_quality_with_service_depth(scored)
     scored = apply_service_depth_to_ranking(scored, service_requirement=query.supply_need)
 
     origin_pp = origin_context["origin_pp_multiplier"]
