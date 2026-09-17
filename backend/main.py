@@ -11,25 +11,14 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from basic_comfort import add_basic_comfort_v3
 from city_intelligence import get_country_cities
-from data_sources import (
-    add_origin_fx_tailwind_diagnostics,
-    build_dataset,
-    compute_scores,
-    promote_origin_fx_tailwind_component,
-    resolve_origin_context,
-)
-from fx_opportunity import (
-    FX_MAX_RANKING_EFFECT,
-    add_fx_opportunity_v2,
-    apply_fx_opportunity_to_ranking,
-)
+from data_sources import build_dataset, resolve_origin_context
+from fx_opportunity import FX_MAX_RANKING_EFFECT
 from mobility_digital import enrich_cities_phase6
 from model_contract import phase_7_methodology
 from phase7_registry import get_phase7_source_registry
-from ranking_v7 import add_city_usability_v7, apply_phase7_country_ranking
-from service_depth import add_service_depth_v4, align_data_quality_with_service_depth
+from production_ranking import prepare_country_evidence, rank_prepared_countries
+from ranking_v7 import add_city_usability_v7
 from source_registry import get_methodology_summary
 
 
@@ -164,52 +153,34 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     df_raw, meta = _get_cached_dataset(target_year=query.year)
     origin_context = resolve_origin_context(df_raw, query.origin_iso3)
 
-    # Legacy score construction is retained only to generate backwards-compatible
-    # audit/component fields. Phase 7 replaces its GDP-based production ordering.
-    scored = compute_scores(
-        df_raw,
-        nominal_penalty_exp=1.0,
-        ppp_quality_floor=10_000.0,
-        floor_strength=2.0,
-        tourism_cost_weight=1.0,
-        tourism_infra_weight=0.0,
-        safety_weight=1.0,
-        arrivals_weight=1.0,
-        min_stability=None,
-    )
-
-    # Objective evidence layers. Preference effects are applied centrally in Phase 7.
-    scored = add_basic_comfort_v3(scored, target_year=query.year)
-    scored = add_service_depth_v4(scored, target_year=query.year)
-    scored = align_data_quality_with_service_depth(scored)
-
+    # Phase 7.1 starts from the raw country universe. Objective evidence layers are
+    # added without filtering. The legacy GDP-led scorer runs only on a separate copy
+    # inside prepare_country_evidence and is left-joined back as prefixed audit data.
+    prepared = prepare_country_evidence(df_raw, target_year=query.year)
     origin_pp = origin_context["origin_pp_multiplier"]
     origin_currency = origin_context["origin_currency"]
 
-    # Phase 7 country rebuild: direct origin-relative purchasing power plus explicit
-    # confidence-aware shortfall penalties. Legacy GDP score no longer drives rank.
-    scored = apply_phase7_country_ranking(
-        scored,
+    scored = rank_prepared_countries(
+        prepared,
         origin_pp_multiplier=origin_pp,
+        origin_currency=origin_currency,
         cheapness_priority=query.budget_sens,
         comfort_requirement=query.comfort,
         service_requirement=query.supply_need,
         stability_priority=query.risk_pri,
     )
 
-    # Phase 2 FX timing remains the final bounded overlay after structural/usability penalties.
-    scored = add_origin_fx_tailwind_diagnostics(scored, origin_currency)
-    scored = promote_origin_fx_tailwind_component(scored)
-    scored = add_fx_opportunity_v2(scored, origin_currency)
-    scored = apply_fx_opportunity_to_ranking(scored)
-
-    scored["stability"] = scored["component_safety_stability"]
-    scored["quality_adjusted_value"] = scored["component_overall_value"]
-    scored["rank"] = np.arange(1, len(scored) + 1)
-    scored["Score"] = scored["quality_adjusted_value"]
-
     top = scored.head(250).replace([np.inf, -np.inf], np.nan)
     results = top.where(top.notna(), None).to_dict(orient="records")
+
+    legacy_available = prepared.get(
+        "legacy_score_available_pre_phase7",
+        pd.Series(False, index=prepared.index),
+    ).fillna(False).astype(bool)
+    ranked_without_legacy = scored.get(
+        "legacy_score_available_pre_phase7",
+        pd.Series(False, index=scored.index),
+    ).fillna(False).astype(bool)
 
     meta["origin_requested"] = origin_context["origin_requested"]
     meta["origin_used"] = origin_context["origin_used"]
@@ -219,6 +190,13 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     meta["model_contract"] = "phase_7_rebuilt_country_value_city_usability"
     meta["daily_cost_estimate_removed"] = True
     meta["phase7_legacy_gdp_score_drives_ranking"] = False
+    meta["phase71_legacy_score_gates_country_universe"] = False
+    meta["phase71_raw_country_count"] = int(len(df_raw))
+    meta["phase71_prepared_country_count"] = int(len(prepared))
+    meta["phase71_legacy_scored_country_count"] = int(legacy_available.sum())
+    meta["phase71_ranked_country_count"] = int(len(scored))
+    meta["phase71_ranked_without_legacy_score_count"] = int((~ranked_without_legacy).sum())
+    meta["phase71_production_stability_source"] = "World Bank WGI Political Stability direct 0-100 mapping"
     meta["phase7_structural_pp_bounds"] = [1.0 / 3.0, 3.0]
     meta["phase7_stability_priority_zero_is_neutral"] = True
     meta["fx_opportunity_horizons"] = ["1w", "1m", "3m", "1y", "3y"]
