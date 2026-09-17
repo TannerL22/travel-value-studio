@@ -67,9 +67,9 @@ def _shortfall_penalty(
 ) -> float:
     """Coverage-aware shortfall penalty with an optional maximum dimension haircut.
 
-    ``max_haircut=1`` preserves the original hard shortfall behavior used for Basic
-    Comfort. Partial proxy dimensions can use a smaller cap so a single imperfect
-    signal cannot reduce the entire destination score toward zero by itself.
+    ``max_haircut=1`` preserves the hard-shortfall authority used for Basic Comfort.
+    Partial proxy dimensions can use a smaller cap so a single imperfect signal cannot
+    reduce the entire destination score toward zero by itself.
     """
     req = float(np.clip(requirement, 0.0, 1.0))
     cov = float(np.clip(coverage, 0.0, 1.0))
@@ -91,9 +91,12 @@ def _shortfall_penalty(
 
 def basic_comfort_penalty(score: object, requirement: float, coverage: float = 1.0) -> float:
     # Basic living foundations are the one requirement dimension allowed to impose a
-    # full shortfall penalty: water, sanitation, electricity, internet and healthcare
-    # access are directly relevant to whether a destination is practical to live in.
-    return _shortfall_penalty(score, requirement, 55.0, 90.0, 1.5, coverage, max_haircut=1.0)
+    # full shortfall penalty because they directly describe whether a destination is
+    # practical to live in. The control curve is intentionally smoother than the
+    # original Phase 7 version: the target moves 60->85 and convexity rises only
+    # modestly. This keeps moderate preference adjustments from producing cliff-edge
+    # rank changes while preserving a severe penalty at genuinely poor comfort levels.
+    return _shortfall_penalty(score, requirement, 60.0, 85.0, 0.5, coverage, max_haircut=1.0)
 
 
 def service_depth_penalty(score: object, requirement: float, coverage: float = 1.0) -> float:
