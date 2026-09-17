@@ -20,7 +20,10 @@ type ModalDialogOptions = {
 
 export function useModalDialog({ open, onClose, containerRef, initialFocusRef }: ModalDialogOptions) {
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
