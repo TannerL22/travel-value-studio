@@ -99,7 +99,7 @@ export function ControlPanel({ values, setValues, origins }: ControlPanelProps) 
           </section>
 
           <section className="mt-auto border-t border-white/10 pt-4">
-            <p className="text-[10px] leading-4 text-zinc-500">Phase 4 now uses accommodation/tourism-service supply rather than raw arrival volume as the main Service Depth signal. Comfort and Service Depth act as shortfall penalties; FX timing remains a bounded final overlay.</p>
+            <p className="text-[10px] leading-4 text-zinc-500">Phase 5 adds a city-level amenity drill-down after the country screen. City POI density currently helps you choose within a country but does not alter the national ranking; Phase 6 will add mobility and digital convenience.</p>
           </section>
         </div>
       </TooltipProvider>
