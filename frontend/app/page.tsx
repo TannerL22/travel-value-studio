@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
-import { BookOpen, Map, X } from "lucide-react";
+import { BookOpen, GitCompareArrows, Map, X } from "lucide-react";
 
 import { RankingList } from "@/components/discover/RankingList";
 import { MethodologyPanel } from "@/components/MethodologyPanel";
@@ -102,6 +102,11 @@ export default function Home() {
     router.push(`/country/${code}?${params}`);
   };
 
+  const openCompare = () => {
+    const params = preferencesToSearchParams(filters).toString();
+    router.push(`/compare?${params}`);
+  };
+
   const handleMobileMapSelect = (country: RankingRow) => {
     setIsMobileMapOpen(false);
     openCountry(country);
@@ -120,6 +125,9 @@ export default function Home() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <Button type="button" variant="outline" className="h-10 border-white/10 bg-zinc-950/60 px-3 text-xs uppercase tracking-[0.16em] text-zinc-200" onClick={openCompare}>
+            <GitCompareArrows className="h-3.5 w-3.5" /> Compare
+          </Button>
           <Button type="button" variant="outline" className="h-10 border-white/10 bg-zinc-950/60 px-3 text-xs uppercase tracking-[0.16em] text-zinc-200" onClick={() => setIsMethodologyOpen(true)}>
             <BookOpen className="h-3.5 w-3.5" /> Method
           </Button>
