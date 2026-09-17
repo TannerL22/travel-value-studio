@@ -13,7 +13,7 @@ import { ValueSummary } from "@/components/country/ValueSummary";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrigins } from "@/hooks/useOrigins";
 import { useRankings } from "@/hooks/useRankings";
-import { parsePreferences, preferenceLevel } from "@/lib/preferences";
+import { parsePreferences, preferenceLevel, preferencesToSearchParams } from "@/lib/preferences";
 
 export function CountryDetailClient({ iso3, queryString }: { iso3: string; queryString: string }) {
   const filters = useMemo(() => parsePreferences(new URLSearchParams(queryString)), [queryString]);
@@ -24,7 +24,9 @@ export function CountryDetailClient({ iso3, queryString }: { iso3: string; query
   const country = useMemo(() => results.find((row) => row.iso3?.toUpperCase() === iso3.toUpperCase()) ?? null, [results, iso3]);
   const origin = origins.find((item) => item.code === filters.origin_iso3);
   const referenceLabel = origin ? `${origin.name} · ${origin.currency}` : filters.origin_iso3;
-  const backHref = queryString ? `/?${queryString}` : "/";
+  const preferenceQuery = useMemo(() => preferencesToSearchParams(filters).toString(), [filters]);
+  const backHref = `/?${preferenceQuery}`;
+  const compareHref = `/compare?${preferenceQuery}&countries=${iso3.toUpperCase()}`;
 
   useEffect(() => {
     if (!country) return;
@@ -66,7 +68,7 @@ export function CountryDetailClient({ iso3, queryString }: { iso3: string; query
 
   return (
     <div className="space-y-12 pb-10 sm:space-y-16">
-      <CountryHero country={country} backHref={backHref} imageUrl={imageUrl} referenceLabel={referenceLabel} />
+      <CountryHero country={country} backHref={backHref} compareHref={compareHref} imageUrl={imageUrl} referenceLabel={referenceLabel} />
 
       <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4 sm:px-6">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-500">
