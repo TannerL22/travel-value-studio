@@ -34,6 +34,11 @@ type MethodologyPanelProps = {
 };
 
 const priorityFields = [
+  "service_depth",
+  "service_depth_ttdi_2024_value",
+  "service_depth_coverage",
+  "service_depth_penalty",
+  "service_depth_arrivals_per_100",
   "basic_comfort",
   "comfort_water_safe_pct",
   "comfort_sanitation_safe_pct",
@@ -52,11 +57,11 @@ const priorityFields = [
 
 const components = [
   ["Structural purchasing power", "Broad destination purchasing power relative to the selected origin. This is the structural cheapness layer rather than a personal daily-budget estimate."],
-  ["Basic comfort", "Phase 3 production composite built from drinking water, sanitation, electricity, internet use and UHC service coverage. Pillars saturate after a strong baseline, and incomplete data blend toward the legacy GDP-PPP proxy."],
-  ["FX opportunity", "Bilateral timing signal across 1W, 1M, 3M, 1Y and 3Y. It is applied after Basic Comfort and is capped so short-term currency moves cannot dominate structural value."],
-  ["Service depth", "Still mainly an international-arrivals proxy. Phase 4 will replace this with measured amenity, accommodation and service supply."],
+  ["Basic comfort", "Phase 3 direct-services composite built from drinking water, sanitation, electricity, internet use and UHC service coverage. Pillars saturate after a strong baseline, and incomplete data blend toward a fixed legacy GDP-PPP proxy."],
+  ["Service depth", "Phase 4 production supply signal. WEF TTDI Tourist Services & Infrastructure is preferred; arrivals per resident are used only as a capped, reduced-confidence fallback outside TTDI coverage."],
+  ["FX opportunity", "Bilateral timing signal across 1W, 1M, 3M, 1Y and 3Y. It is applied after Basic Comfort and Service Depth and is capped so short-term currency moves cannot dominate structural value."],
   ["Stability", "Current WGI-led political-stability signal. It should not be read as a complete crime or personal-safety measure."],
-  ["Quality-adjusted value", "The production score after structural purchasing power, Phase 3 Basic Comfort, current service/stability terms and the bounded Phase 2 FX timing overlay."],
+  ["Quality-adjusted value", "The production score after structural purchasing power, Basic Comfort and Service Depth shortfall penalties, the existing stability term, and the bounded FX timing overlay."],
 ] as const;
 
 export function MethodologyPanel({ apiUrl, isOpen, onClose }: MethodologyPanelProps) {
@@ -86,7 +91,7 @@ export function MethodologyPanel({ apiUrl, isOpen, onClose }: MethodologyPanelPr
       .filter((field): field is SourceField => Boolean(field));
     const prioritySet = new Set(priorityFields);
     const remaining = Object.values(sourceRegistry).filter((field) => !prioritySet.has(field.field_name));
-    return [...priority, ...remaining].slice(0, 18);
+    return [...priority, ...remaining].slice(0, 22);
   }, [sourceRegistry]);
 
   return (
@@ -96,7 +101,7 @@ export function MethodologyPanel({ apiUrl, isOpen, onClose }: MethodologyPanelPr
           <motion.div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl" initial={{ y: 28, scale: 0.98 }} animate={{ y: 0, scale: 1 }} exit={{ y: 28, scale: 0.98 }} onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Methodology · Phase 3</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Methodology · Phase 4</p>
                 <h2 className="mt-1 text-xl font-semibold text-white">Where does my foreign currency buy the most usable quality of life?</h2>
               </div>
               <Button type="button" variant="outline" size="icon-sm" className="border-white/10 bg-white/5 text-zinc-300" onClick={onClose} aria-label="Close methodology"><X className="h-4 w-4" /></Button>
@@ -109,7 +114,7 @@ export function MethodologyPanel({ apiUrl, isOpen, onClose }: MethodologyPanelPr
                 <div className="space-y-8">
                   <section className="grid gap-4 md:grid-cols-3">
                     <div className="rounded-xl border border-white/10 bg-white/5 p-4 md:col-span-2">
-                      <div className="flex items-start gap-3"><BookOpen className="mt-1 h-4 w-4 text-violet-400" /><div><h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-300">Current model</h3><p className="mt-2 text-sm leading-6 text-zinc-400">{methodology?.current_model_status ?? "Phase 3 direct basic-service comfort floor."}</p></div></div>
+                      <div className="flex items-start gap-3"><BookOpen className="mt-1 h-4 w-4 text-violet-400" /><div><h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-300">Current model</h3><p className="mt-2 text-sm leading-6 text-zinc-400">{methodology?.current_model_status ?? "Phase 4 supply-side Service Depth with direct Basic Comfort and bilateral FX timing."}</p></div></div>
                     </div>
                     <div className="rounded-xl border border-white/10 bg-zinc-950/50 p-4">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Target use</p>
