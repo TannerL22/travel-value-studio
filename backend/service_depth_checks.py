@@ -47,6 +47,7 @@ def test_direct_supply_preferred_and_arrivals_only_fallback() -> None:
                         "iso3": "AAA",
                         "service_depth_ttdi_2024_value": 5.2,
                         "service_depth_ttdi_2024_rank": 20,
+                        "service_depth_ttdi_provenance": "wef_official_xlsx",
                     }
                 ]
             ),
@@ -76,6 +77,39 @@ def test_direct_supply_preferred_and_arrivals_only_fallback() -> None:
         assert out.loc["CCC", "service_depth_source"] == "unavailable"
         assert out.loc["CCC", "service_depth_coverage"] == 0.0
         assert out.loc["AAA", "legacy_service_depth"] == 80.0
+    finally:
+        sd.fetch_ttdi_service_frame = original_ttdi
+        sd.fetch_population_frame = original_population
+
+
+def test_public_mirror_ttdi_is_discounted_but_direct() -> None:
+    original_ttdi = sd.fetch_ttdi_service_frame
+    original_population = sd.fetch_population_frame
+    try:
+        sd.fetch_ttdi_service_frame = lambda force_refresh=False: (
+            pd.DataFrame(
+                [
+                    {
+                        "iso3": "AAA",
+                        "service_depth_ttdi_2024_value": 5.2,
+                        "service_depth_ttdi_2024_rank": 20,
+                        "service_depth_ttdi_provenance": "wef_2024_dataset_public_mirror_fallback",
+                    }
+                ]
+            ),
+            "wef_official_xlsx_failed:ValueError|wef_public_mirror_fallback_used",
+        )
+        sd.fetch_population_frame = lambda target_year, force_refresh=False: (
+            pd.DataFrame([{"iso3": "AAA", "service_depth_population": 1_000_000, "service_depth_population_year": 2025}]),
+            "",
+        )
+        out = sd.add_service_depth_v4(
+            pd.DataFrame([{"iso3": "AAA", "intl_arrivals": 1_000_000, "arrivals_year": 2024}]),
+            target_year=2025,
+        ).set_index("iso3")
+        assert out.loc["AAA", "service_depth_source"] == "wef_ttdi_2024_tourist_services"
+        assert out.loc["AAA", "service_depth_coverage"] == 0.90
+        assert "service_depth_wef_public_mirror_fallback" in out.loc["AAA", "service_depth_flags"]
     finally:
         sd.fetch_ttdi_service_frame = original_ttdi
         sd.fetch_population_frame = original_population
@@ -171,6 +205,7 @@ def main() -> None:
     test_arrivals_fallback_is_capped()
     test_official_workbook_parser_shape()
     test_direct_supply_preferred_and_arrivals_only_fallback()
+    test_public_mirror_ttdi_is_discounted_but_direct()
     test_zero_service_requirement_removes_penalty()
     test_high_service_requirement_can_change_order()
     test_missing_evidence_does_not_create_penalty()
