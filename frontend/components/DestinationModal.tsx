@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Check, Plus, TrendingUp, Wallet, X } from "lucide-react";
 
 import { type RankingRow } from "@/app/page";
+import { CityIntelligencePanel } from "@/components/CityIntelligencePanel";
 import { Button } from "@/components/ui/button";
 
 type DestinationModalProps = {
@@ -244,6 +245,8 @@ export function DestinationModal({ country, isOpen, onClose, allResults, imageUr
               </div>
               <p className="mt-3 text-[10px] leading-4 text-zinc-500">WEF TTDI 2024 is the preferred country-level supply benchmark. Arrivals per resident are used only outside TTDI coverage and receive 45% evidence weight. Missing evidence is neutral. Reference year: {detail.service_depth_reference_year ?? "N/A"}.</p>
             </div>
+
+            <CityIntelligencePanel iso3={country.iso3} />
 
             <div className="mb-7 rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
