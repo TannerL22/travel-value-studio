@@ -40,6 +40,18 @@ def test_service_and_stability_are_meaningful_but_not_single_factor_vetoes() -> 
     assert 0.75 < weak_stability < 1.0
 
 
+def test_comfort_curve_is_strong_but_smooth_for_normal_adjustments() -> None:
+    # A moderate-quality destination should be penalized more as the user raises the
+    # requirement, but a normal 0.35 -> 0.75 control change should not create a cliff.
+    low_requirement = r7.basic_comfort_penalty(65.0, 0.35, 1.0)
+    high_requirement = r7.basic_comfort_penalty(65.0, 0.75, 1.0)
+    assert high_requirement < low_requirement
+    assert low_requirement - high_requirement < 0.20
+    # Truly poor foundations can still receive a severe penalty at maximum concern.
+    assert r7.basic_comfort_penalty(20.0, 1.0, 1.0) < 0.15
+    assert r7.basic_comfort_penalty(0.0, 1.0, 1.0) == 0.0
+
+
 def test_comfort_and_service_can_change_order() -> None:
     frame = pd.DataFrame(
         [
@@ -162,6 +174,7 @@ def main() -> None:
     test_missing_stability_is_not_penalized()
     test_partial_proxy_penalties_have_explicit_floors()
     test_service_and_stability_are_meaningful_but_not_single_factor_vetoes()
+    test_comfort_curve_is_strong_but_smooth_for_normal_adjustments()
     test_comfort_and_service_can_change_order()
     test_legacy_gdp_or_score_cannot_drive_phase7_order()
     test_cheapness_priority_changes_elasticity_not_direction()
