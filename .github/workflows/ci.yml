@@ -17,9 +17,11 @@ jobs:
       - name: Install backend dependencies
         run: pip install -r backend/requirements.txt
       - name: Compile backend
-        run: python -m py_compile backend/main.py backend/data_sources.py backend/source_registry.py backend/model_contract.py
+        run: python -m py_compile backend/main.py backend/data_sources.py backend/source_registry.py backend/model_contract.py backend/fx_opportunity.py backend/phase2_registry.py
       - name: Run backend sanity checks
         run: python backend/sanity_checks.py
+      - name: Run Phase 2 FX checks
+        run: python backend/fx_opportunity_checks.py
 
   frontend:
     runs-on: ubuntu-latest
