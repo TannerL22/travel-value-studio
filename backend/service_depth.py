@@ -48,11 +48,32 @@ def _get_wef_workbook(timeout: int = 60) -> bytes:
     return response.content
 
 
+def _detect_header_row(excel: pd.ExcelFile, sheet_name: str, scan_rows: int = 25) -> Optional[int]:
+    """Find the workbook row containing the actual TTDI tabular headers.
+
+    The official WEF workbook can contain title/metadata rows before the table. A
+    default ``header=0`` parse therefore succeeds as Excel but silently misses the
+    ISO/pillar columns. Scan the top rows for both required headings before reading
+    the sheet with the detected row as the header.
+    """
+    preview = pd.read_excel(excel, sheet_name=sheet_name, header=None, nrows=scan_rows)
+    iso_target = _normalize_column_name("ISO Code")
+    service_target = _normalize_column_name(TTDI_SERVICE_COLUMN)
+    for row_index, row in preview.iterrows():
+        values = {_normalize_column_name(value) for value in row.tolist() if pd.notna(value)}
+        if iso_target in values and service_target in values:
+            return int(row_index)
+    return None
+
+
 def _parse_ttdi_service_frame(workbook_bytes: bytes) -> pd.DataFrame:
     """Extract ISO3 and the 2024 Tourist Services pillar from the official workbook."""
     excel = pd.ExcelFile(BytesIO(workbook_bytes))
     for sheet_name in excel.sheet_names:
-        frame = pd.read_excel(excel, sheet_name=sheet_name)
+        header_row = _detect_header_row(excel, sheet_name)
+        if header_row is None:
+            continue
+        frame = pd.read_excel(excel, sheet_name=sheet_name, header=header_row)
         if frame.empty:
             continue
         iso_column = _find_column(frame, "ISO Code")
@@ -79,7 +100,8 @@ def _parse_ttdi_service_frame(workbook_bytes: bytes) -> pd.DataFrame:
                 out["service_depth_ttdi_2024_rank"], errors="coerce"
             )
         out = out.dropna(subset=["service_depth_ttdi_2024_value"])
-        return out.drop_duplicates(subset=["iso3"], keep="first").reset_index(drop=True)
+        if not out.empty:
+            return out.drop_duplicates(subset=["iso3"], keep="first").reset_index(drop=True)
     raise ValueError("TTDI Tourist Services and Infrastructure column not found")
 
 
