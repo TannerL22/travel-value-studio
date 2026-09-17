@@ -15,6 +15,9 @@ type DestinationResultProps = {
   country: RankingRow;
   index: number;
   onClick?: () => void;
+  onHoverChange?: (country: RankingRow | null) => void;
+  isActive?: boolean;
+  compact?: boolean;
 };
 
 const formatScore = (value: number | null | undefined) => {
@@ -27,7 +30,14 @@ const formatMultiplier = (value: number | null | undefined) => {
   return `${value.toFixed(2)}×`;
 };
 
-export function DestinationResult({ country, index, onClick }: DestinationResultProps) {
+export function DestinationResult({
+  country,
+  index,
+  onClick,
+  onHoverChange,
+  isActive = false,
+  compact = false,
+}: DestinationResultProps) {
   const name = country.country ?? country.iso3 ?? "Unknown";
   const rank = country.rank ?? index + 1;
   const valueScore = country.quality_adjusted_value ?? country.Score ?? country.score ?? null;
@@ -43,18 +53,26 @@ export function DestinationResult({ country, index, onClick }: DestinationResult
       exit={{ opacity: 0, y: 8 }}
       transition={{ duration: 0.28, delay: Math.min(index, 8) * 0.025 }}
       onClick={onClick}
-      className="group flex h-full w-full flex-col rounded-2xl border border-white/10 bg-zinc-950/45 p-5 text-left shadow-lg shadow-black/10 transition hover:border-white/20 hover:bg-zinc-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+      onMouseEnter={() => onHoverChange?.(country)}
+      onMouseLeave={() => onHoverChange?.(null)}
+      onFocus={() => onHoverChange?.(country)}
+      onBlur={() => onHoverChange?.(null)}
+      className={`group flex h-full w-full flex-col rounded-2xl border p-5 text-left shadow-lg shadow-black/10 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 ${
+        isActive
+          ? "border-cyan-300/50 bg-cyan-950/25 ring-1 ring-cyan-300/15"
+          : "border-white/10 bg-zinc-950/45 hover:border-white/20 hover:bg-zinc-900/60"
+      }`}
       aria-label={`Open ${name}, value rank ${rank}`}
     >
       <div className="flex items-start justify-between gap-5">
         <div className="min-w-0">
           <p className="text-[11px] font-medium tabular-nums text-zinc-500">#{rank}</p>
-          <h2 className="mt-1 truncate text-xl font-semibold tracking-tight text-white">{name}</h2>
+          <h2 className={`${compact ? "text-lg" : "text-xl"} mt-1 truncate font-semibold tracking-tight text-white`}>{name}</h2>
           <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">{country.iso3 ?? ""}</p>
         </div>
 
         <div className="shrink-0 text-right">
-          <p className="text-3xl font-semibold tabular-nums tracking-tight text-white">{formatScore(valueScore)}</p>
+          <p className={`${compact ? "text-2xl" : "text-3xl"} font-semibold tabular-nums tracking-tight text-white`}>{formatScore(valueScore)}</p>
           <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-zinc-500">Value score</p>
         </div>
       </div>
@@ -70,17 +88,19 @@ export function DestinationResult({ country, index, onClick }: DestinationResult
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2 text-xs text-zinc-300">
-        {country.basic_comfort != null ? (
-          <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1.5">Comfort {Math.round(country.basic_comfort)}</span>
-        ) : null}
-        {country.service_depth != null ? (
-          <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1.5">Services {Math.round(country.service_depth)}</span>
-        ) : null}
-        {country.stability != null ? (
-          <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1.5">Stability {Math.round(country.stability)}</span>
-        ) : null}
-      </div>
+      {!compact ? (
+        <div className="mt-4 flex flex-wrap gap-2 text-xs text-zinc-300">
+          {country.basic_comfort != null ? (
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1.5">Comfort {Math.round(country.basic_comfort)}</span>
+          ) : null}
+          {country.service_depth != null ? (
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1.5">Services {Math.round(country.service_depth)}</span>
+          ) : null}
+          {country.stability != null ? (
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1.5">Stability {Math.round(country.stability)}</span>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mt-5 flex-1">
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Why it ranks</p>
