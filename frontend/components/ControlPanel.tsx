@@ -53,7 +53,7 @@ export function ControlPanel({ values, setValues, origins }: ControlPanelProps) 
                 <span>Origin Currency</span>
                 <Tooltip>
                   <TooltipTrigger asChild><button type="button" className="text-zinc-500 hover:text-zinc-200" aria-label="Origin currency info"><Info className="h-3.5 w-3.5" /></button></TooltipTrigger>
-                  <TooltipContent className="max-w-xs border border-white/10 bg-zinc-950/90 text-xs text-zinc-100">Select the country whose primary currency you hold or earn. Phase 2 uses that currency for bilateral 1W, 1M, 3M, 1Y, and 3Y FX opportunity signals as well as relative purchasing power.</TooltipContent>
+                  <TooltipContent className="max-w-xs border border-white/10 bg-zinc-950/90 text-xs text-zinc-100">Select the country whose primary currency you hold or earn. The model uses that currency for relative purchasing power and bilateral 1W, 1M, 3M, 1Y and 3Y FX opportunity.</TooltipContent>
                 </Tooltip>
               </div>
               <select className="h-9 w-full rounded-md border border-white/10 bg-zinc-900 px-3 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500/70" value={values.origin_iso3} onChange={(event) => setField("origin_iso3", event.target.value)}>
@@ -83,7 +83,7 @@ export function ControlPanel({ values, setValues, origins }: ControlPanelProps) 
 
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs uppercase tracking-wide text-zinc-400">
-                <div className="flex items-center gap-2"><span>Service Depth</span><Tooltip><TooltipTrigger asChild><button type="button" aria-label="Service depth info" className="text-zinc-500 transition hover:text-zinc-200"><Info className="h-3.5 w-3.5" /></button></TooltipTrigger><TooltipContent className="max-w-xs border border-white/10 bg-zinc-950/90 text-xs text-zinc-100">Higher = prefer destinations where cheapness is easier to convert into usable services and established visitor infrastructure. The current model still relies mainly on international arrivals as a proxy.</TooltipContent></Tooltip></div>
+                <div className="flex items-center gap-2"><span>Service Depth Requirement</span><Tooltip><TooltipTrigger asChild><button type="button" aria-label="Service depth requirement info" className="text-zinc-500 transition hover:text-zinc-200"><Info className="h-3.5 w-3.5" /></button></TooltipTrigger><TooltipContent className="max-w-xs border border-white/10 bg-zinc-950/90 text-xs text-zinc-100">Higher = more strongly penalize destinations with thin accommodation and established visitor-service supply. Phase 4 prefers WEF TTDI Tourist Services & Infrastructure; arrivals per resident are only a reduced-confidence fallback outside TTDI coverage.</TooltipContent></Tooltip></div>
                 <span className="text-zinc-200">{values.supply_need.toFixed(2)}</span>
               </div>
               <Slider min={0} max={1} step={0.05} value={[values.supply_need]} onValueChange={(value) => setField("supply_need", value[0] ?? 0)} className="[&_[data-slot=slider-range]]:bg-zinc-200/60 [&_[data-slot=slider-thumb]]:border-zinc-200 [&_[data-slot=slider-thumb]]:ring-white/20" />
@@ -99,7 +99,7 @@ export function ControlPanel({ values, setValues, origins }: ControlPanelProps) 
           </section>
 
           <section className="mt-auto border-t border-white/10 pt-4">
-            <p className="text-[10px] leading-4 text-zinc-500">Phase 3 now uses direct basic-service evidence for the comfort floor. Phase 2 FX timing remains a bounded overlay, so currency moves can matter without overpowering structural purchasing power or the comfort requirement you set.</p>
+            <p className="text-[10px] leading-4 text-zinc-500">Phase 4 now uses accommodation/tourism-service supply rather than raw arrival volume as the main Service Depth signal. Comfort and Service Depth act as shortfall penalties; FX timing remains a bounded final overlay.</p>
           </section>
         </div>
       </TooltipProvider>
