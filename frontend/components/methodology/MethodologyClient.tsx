@@ -61,19 +61,19 @@ export function MethodologyClient({ queryString }: { queryString: string }) {
   return (
     <div className="space-y-12 pb-12 sm:space-y-16">
       <header className="max-w-4xl pt-3">
-        <Link href={`/?${backQuery}`} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm text-zinc-300 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
+        <Link href={`/?${backQuery}`} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
           <ArrowLeft className="h-4 w-4" /> Back to Discover
         </Link>
-        <p className="mt-8 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">Methodology</p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-5xl">Understand the result before trusting it</h1>
-        <p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-300 sm:text-base">
-          The first section explains Travel Value Studio in plain language. The advanced section exposes the backend model contract, source registry, caveats and known blind spots for anyone who wants to audit the result more deeply.
+        <p className="mt-8 text-sm font-medium text-cyan-300/80">Methodology</p>
+        <h1 className="mt-2 text-4xl font-semibold tracking-tight text-white sm:text-5xl">Understand the result before trusting it</h1>
+        <p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-400 sm:text-base">
+          Start with the plain-language scoring flow, then inspect the live backend contract, source registry, caveats and known blind spots if you want to audit the result more deeply.
         </p>
       </header>
 
       <HowItWorks />
 
-      <section className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.04] p-5 sm:p-6" aria-labelledby="housing-blind-spot-title">
+      <section className="border-y border-amber-300/15 bg-amber-300/[0.025] py-5" aria-labelledby="housing-blind-spot-title">
         <div className="flex items-start gap-3">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" />
           <div>
@@ -86,7 +86,7 @@ export function MethodologyClient({ queryString }: { queryString: string }) {
       </section>
 
       {loading ? <MethodologySkeleton /> : error || !methodology ? (
-        <section className="rounded-3xl border border-amber-300/15 bg-amber-300/[0.03] p-6 text-sm leading-6 text-zinc-300" role="alert">
+        <section className="border-y border-amber-300/15 bg-amber-300/[0.025] py-6 text-sm leading-6 text-zinc-300" role="alert">
           The advanced methodology data could not be loaded from the backend. The plain-language scoring explanation above remains valid, but the live source registry is unavailable right now.
         </section>
       ) : (
@@ -98,14 +98,14 @@ export function MethodologyClient({ queryString }: { queryString: string }) {
 
 function MethodologySkeleton() {
   return (
-    <div className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.02] p-6 sm:p-8" aria-live="polite" aria-busy="true" aria-label="Loading advanced methodology">
+    <div className="space-y-4 border-y border-white/[0.08] py-6 sm:py-8" aria-live="polite" aria-busy="true" aria-label="Loading advanced methodology">
       <span className="sr-only">Loading advanced methodology and source registry…</span>
       <Skeleton className="h-5 w-48 bg-white/10" aria-hidden="true" />
       <Skeleton className="h-8 w-80 max-w-full bg-white/10" aria-hidden="true" />
       <div className="grid gap-3 md:grid-cols-3" aria-hidden="true">
         {Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-xl bg-white/5" />)}
       </div>
-      <Skeleton className="h-72 rounded-2xl bg-white/5" aria-hidden="true" />
+      <Skeleton className="h-72 rounded-xl bg-white/5" aria-hidden="true" />
     </div>
   );
 }
