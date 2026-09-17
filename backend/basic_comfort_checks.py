@@ -4,6 +4,7 @@ import pandas as pd
 
 from basic_comfort import (
     PILLAR_WEIGHTS,
+    _legacy_gdp_comfort,
     _select_service,
     _weighted_geometric,
     apply_basic_comfort_to_ranking,
@@ -39,6 +40,12 @@ def test_weighted_geometric_is_coverage_aware() -> None:
     direct, coverage = _weighted_geometric(values, reliability)
     assert direct == 1.0
     assert abs(coverage - 0.85) < 1e-12
+
+
+def test_legacy_fallback_is_objective_and_saturating() -> None:
+    assert _legacy_gdp_comfort(12_000.0) == 1.0
+    assert _legacy_gdp_comfort(24_000.0) == 1.0
+    assert abs(_legacy_gdp_comfort(6_000.0) - 0.25) < 1e-12
 
 
 def test_zero_comfort_requirement_removes_comfort_penalty() -> None:
@@ -96,6 +103,7 @@ def main() -> None:
     test_saturating_thresholds()
     test_basic_water_fallback_is_explicitly_weaker()
     test_weighted_geometric_is_coverage_aware()
+    test_legacy_fallback_is_objective_and_saturating()
     test_zero_comfort_requirement_removes_comfort_penalty()
     test_high_comfort_requirement_can_change_order()
     print("Phase 3 basic comfort checks passed")
