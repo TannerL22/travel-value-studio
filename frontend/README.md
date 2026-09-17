@@ -4,7 +4,7 @@ Next.js application for Travel Value Studio.
 
 ## Frontend v2 status
 
-**Phase 2 — Preference UX: implemented.**
+**Phase 3 — Ranked Destination Results: implemented.**
 
 The frontend is being rebuilt around a product architecture rather than the original model-debugging dashboard.
 
@@ -49,6 +49,32 @@ The collapsed Preference Bar shows the selected reference market/currency plus s
 The responsive Preference Drawer opens as a bottom sheet on smaller screens and a right-side panel on larger screens. It preserves the exact continuous 0–1 backend parameters while presenting plain-language states such as `Flexible`, `Balanced`, `High`, `Very high`, and `Ignore`. Changes update rankings immediately and continue to persist through the URL.
 
 `lib/preferences.ts` is the single frontend definition for preference labels, semantic state mapping, URL serialization/parsing, and reset behavior. Resetting preferences leaves the selected reference market and year intact.
+
+### Phase 3 ranked results
+
+The photo-heavy `DestinationCard` has been removed. Discover now uses:
+
+```text
+components/discover/
+  DestinationResult.tsx
+
+lib/
+  ranking-explanations.ts
+```
+
+Each result exposes the backend value rank, Quality-Adjusted Value score, origin-relative purchasing power, bounded FX ranking effect, and direct Comfort / Services / Stability evidence. The card no longer displays visitor arrivals, star ratings, value percentiles, hover-only metrics, or frontend-invented verdicts such as `Strong Arbitrage`.
+
+`lib/ranking-explanations.ts` does not calculate a new score. It reads the actual Phase 7 multiplicative ranking effects already returned by the backend:
+
+- `structural_value_factor`
+- `basic_comfort_penalty`
+- `service_depth_penalty`
+- `stability_penalty`
+- `fx_opportunity_multiplier`
+
+It then identifies the largest observed tailwind and drag for explanatory display only. The backend remains the sole source of ranking order and score.
+
+Country imagery is no longer fetched for the entire ranking list. While the compatibility country modal remains in use, Pexels is requested only when a user opens a destination. Phase 5 will replace that modal with the full country-detail route.
 
 ## Commands
 
