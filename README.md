@@ -6,11 +6,11 @@ The target use case is a stay of several weeks to several months. Airfare and tr
 
 The current product question is:
 
-> **Where does the foreign currency I hold buy the most usable quality of life, and within an attractive country which cities actually give me dense, useful day-to-day choice?**
+> **Where does the foreign currency I hold buy the most usable quality of life, and within attractive countries which cities combine dense everyday choice with practical mobility and low digital friction?**
 
 ## Current model status
 
-The project is at **Phase 5** of the model roadmap.
+The project is at **Phase 6** of the model roadmap.
 
 ### Phase 1 — semantic/model-contract cleanup
 
@@ -38,19 +38,32 @@ See `docs/PHASE_4_SERVICE_DEPTH.md`.
 
 ### Phase 5 — City Intelligence
 
-Completed as a **city-discovery layer**.
+Completed as a **city-discovery layer** using the JRC GHS-WUP-MTUC / UN WUP 2025 urban-centre framework and the latest Overture Maps Places release. Amenity Depth measures both per-capita and spatial POI density across food & drink, shopping, health care, recreation/culture, lifestyle services and lodging.
 
-The country ranking remains the first screen. When a country is opened, the backend can now compare major cities using:
-
-- the JRC **GHS-WUP-MTUC R2025A V1.1** / UN WUP 2025 harmonized urban-centre framework;
-- 2025 city population, land area, built-up area and population-weighted centroids;
-- the latest **Overture Maps Places** release;
-- high-confidence POI density across food & drink, shopping, health care, recreation/culture, lifestyle services and lodging;
-- both per-capita and spatial amenity density, with saturation and a diversity adjustment.
-
-Amenity Depth is **not yet part of the country ranking**. Overture coverage varies by geography, so missing or thin observed POI data cannot safely be interpreted as poor city life. Failed queries remain unavailable rather than being scored as zero.
+Amenity Depth remains a drill-down signal rather than a country-ranking input because Overture coverage varies geographically and missing evidence must not be mistaken for poor city life.
 
 See `docs/PHASE_5_CITY_INTELLIGENCE.md`.
+
+### Phase 6 — Mobility & Digital Convenience
+
+Completed as a **city-usability diagnostic layer**.
+
+Mobility now adds:
+
+- WEF TTDI 2024 **Ground & Port Infrastructure** as a comparable 0–100 national transport baseline;
+- city-level **MobilityDatabase GTFS** matches as positive evidence that machine-readable scheduled transit data exist;
+- explicit `unknown, not zero` treatment when no GTFS catalog match is found.
+
+Digital Convenience now combines:
+
+- internet use from ITU / World Bank WDI;
+- fixed-broadband penetration from ITU / WDI;
+- digital-payment adoption from **Global Findex 2025**, surveyed in 2024;
+- WEF TTDI 2024 ICT Readiness.
+
+Phase 6 does **not** alter production country rankings or Phase 5 Amenity Depth ordering. These diagnostics are exposed first and will be validated before Phase 7 decides whether and how they should enter ranking weights.
+
+See `docs/PHASE_6_MOBILITY_DIGITAL.md`.
 
 ## Core concepts
 
@@ -58,7 +71,9 @@ See `docs/PHASE_5_CITY_INTELLIGENCE.md`.
 - **FX Opportunity** — bilateral origin-currency timing signal using 1W / 1M / 3M / 1Y / 3Y reference moves.
 - **Basic Comfort** — direct-service floor using water, sanitation, electricity, internet and health evidence.
 - **Service Depth** — country-level accommodation and established visitor-service supply.
-- **City Amenity Depth** — city-level discovery score using direct POI density and diversity; currently drill-down only.
+- **City Amenity Depth** — city-level discovery score using direct POI density and diversity.
+- **Mobility** — Phase 6 transport-usability diagnostic using a WEF national baseline plus positive GTFS metadata evidence.
+- **Digital Convenience** — Phase 6 connectivity/payment-readiness diagnostic with explicit evidence coverage.
 - **Stability** — currently WGI-led political stability, not a complete personal-safety or crime measure.
 - **Quality-Adjusted Value** — structural country score after comfort/service shortfall penalties and bounded FX timing.
 
@@ -71,7 +86,7 @@ See `docs/PHASE_5_CITY_INTELLIGENCE.md`.
 5. bounded Phase 2 FX Opportunity overlay;
 6. normalized Quality-Adjusted Value.
 
-Phase 5 city amenities do not alter this country ordering yet.
+Phase 5 Amenity Depth and Phase 6 Mobility / Digital Convenience remain diagnostics until the Phase 7 ranking rebuild and validation.
 
 ## Roadmap
 
@@ -80,13 +95,14 @@ Phase 5 city amenities do not alter this country ordering yet.
 3. **Phase 3 — Basic Comfort:** complete.
 4. **Phase 4 — Service Depth:** complete.
 5. **Phase 5 — City Intelligence:** complete as a drill-down layer.
-6. **Phase 6 — Mobility / Digital Convenience:** public transport and digital-life layers.
+6. **Phase 6 — Mobility / Digital Convenience:** complete as a usability-diagnostic layer.
 7. **Phase 7 — Ranking rebuild and validation.**
 
 ## Project layout
 
 ```text
-backend/   FastAPI API, country scoring, FX Opportunity, Basic Comfort, Service Depth, City Intelligence, validation
+backend/   FastAPI API, country scoring, FX Opportunity, Basic Comfort, Service Depth,
+           City Intelligence, Mobility/Digital diagnostics, validation
 frontend/  Next.js dashboard UI
 docs/      model contracts and methodology notes
 ```
@@ -145,6 +161,8 @@ OVERTURE_AMENITY_CACHE_TTL_SECONDS=604800
 OVERTURE_CONFIDENCE_MIN=0.75
 CITY_CANDIDATE_LIMIT=12
 CITY_AMENITY_MAX_WORKERS=4
+PHASE6_CACHE_TTL_SECONDS=86400
+MOBILITY_CATALOG_CACHE_TTL_SECONDS=86400
 ```
 
 ## Main data sources
@@ -154,11 +172,13 @@ Current inputs include:
 - **World Bank WDI** — GDP, PPP, private-consumption PPP, inflation/FX fallbacks, population, WGI political stability and Phase 3 basic-service indicators.
 - **WHO/UNICEF JMP via WDI** — drinking water and sanitation.
 - **World Bank / Tracking SDG7 via WDI** — electricity access.
-- **ITU via WDI** — internet use.
+- **ITU via WDI** — internet use and fixed-broadband penetration.
 - **WHO via WDI** — UHC service coverage.
-- **World Economic Forum TTDI 2024** — Phase 4 Tourist Services & Infrastructure pillar.
-- **European Commission JRC GHS-WUP-MTUC R2025A V1.1 / UN WUP 2025 framework** — Phase 5 harmonized city universe and 2025 population/area/centroids.
-- **Overture Maps Places** — latest-release city amenity inventories for Phase 5.
+- **World Economic Forum TTDI 2024** — Tourist Services & Infrastructure, Ground & Port Infrastructure and ICT Readiness pillars.
+- **World Bank Global Findex 2025** — 2024 digital-payment usage for Phase 6 Digital Convenience.
+- **MobilityDatabase** — current GTFS feed-catalog metadata used as positive city-level transit-data evidence.
+- **European Commission JRC GHS-WUP-MTUC R2025A V1.1 / UN WUP 2025 framework** — harmonized city universe and 2025 population/area/centroids.
+- **Overture Maps Places** — latest-release city amenity inventories.
 - **IMF DataMapper / WEO** — GDP and inflation where available.
 - **RestCountries** — ISO3-to-primary-currency mapping.
 - **Frankfurter** — current and historical FX for Phase 2.
@@ -167,17 +187,30 @@ The API exposes provenance at:
 
 - `GET /api/source-registry`
 - `GET /api/methodology`
-- `GET /api/cities/{country_iso3}` — Phase 5 city drill-down (`limit` and `include_amenities` supported).
+- `GET /api/cities/{country_iso3}` — city drill-down with `limit`, `include_amenities` and `include_usability`.
 
 ## Phase 5 city audit fields
 
-City rows expose the GHS-WUP city identifiers and denominators plus `amenity_depth`, `amenity_rank_within_country`, total and category POI counts/densities/scores, Overture release/confidence threshold, query success, footprint method/radius and row-level flags.
+City rows expose the GHS-WUP city identifiers and denominators plus `amenity_depth`, `amenity_rank_within_country`, total/category POI counts, density scores, Overture release/confidence threshold, query success, footprint method/radius and row-level flags.
 
-The current amenity footprint is an **equivalent-area circle around the official population-weighted centroid**. It is materially cleaner than counting an entire bounding rectangle, but exact GHS-WUP polygons remain a future precision upgrade.
+The current amenity footprint is an **equivalent-area circle around the official population-weighted centroid**. Exact GHS-WUP polygons remain a precision upgrade.
+
+## Phase 6 usability audit fields
+
+City rows can additionally expose:
+
+- `mobility`, `mobility_source`, `mobility_coverage`, `mobility_ttdi_2024_value`;
+- `mobility_gtfs_feed_count`, `mobility_gtfs_official_feed_count`, `mobility_gtfs_evidence`, `mobility_gtfs_providers`;
+- `digital_convenience`, `digital_convenience_coverage`, `digital_convenience_source`;
+- raw/derived internet, fixed-broadband, digital-payment and TTDI ICT fields.
+
+A zero GTFS feed count with `no_catalog_match_unknown_not_zero` must **not** be interpreted as a zero-transit city.
 
 ## Validation
 
 `backend/validation/` preserves the existing Japan/Taiwan evidence and sensitivity scaffold. Legacy snapshots are not rewritten after scoring changes so historical model behavior remains auditable.
+
+Phase 7 will expand validation across the complete evidence stack before deciding how Phase 5/6 diagnostics should influence recommendations.
 
 ## Checks
 
@@ -189,20 +222,21 @@ npm run build
 
 # Backend
 cd backend
-python -m py_compile main.py data_sources.py source_registry.py model_contract.py fx_opportunity.py phase2_registry.py basic_comfort.py phase3_registry.py service_depth.py phase4_registry.py city_intelligence.py phase5_registry.py
+python -m py_compile main.py data_sources.py source_registry.py model_contract.py fx_opportunity.py phase2_registry.py basic_comfort.py phase3_registry.py service_depth.py phase4_registry.py city_intelligence.py phase5_registry.py mobility_digital.py phase6_registry.py
 python sanity_checks.py
 python fx_opportunity_checks.py
 python basic_comfort_checks.py
 python service_depth_checks.py
 python city_intelligence_checks.py
+python mobility_digital_checks.py
 ```
 
 GitHub Actions runs the backend and frontend checks on pushes to `main` and pull requests.
 
 ## Important interpretation limits
 
-Travel Value Studio is still a discovery/screening model rather than a complete temporary-resident budget model. Furnished housing prices are not yet directly observed. Country-level comfort/service measures can hide large local differences, while Phase 5 POI counts measure amenity **presence and density**, not quality, price, opening hours, accessibility or transit convenience.
+Travel Value Studio is still a discovery/screening model rather than a complete temporary-resident budget model. Furnished medium-term housing prices are not yet directly observed.
 
-Overture provider coverage also varies by geography. A successful query means evidence was retrieved; it does not mean mapping coverage is complete.
+Phase 5 POI evidence measures amenity presence/density rather than venue price or subjective quality. Phase 6 improves transport/digital context but remains imperfect: the WEF mobility score is national, GTFS metadata reflect open-data availability rather than service quality, and Digital Convenience is a country-level connectivity/payment environment rather than a guarantee of apartment Wi-Fi, eSIM availability or acceptance of a specific foreign card.
 
-Phase 6 therefore focuses on **Mobility and Digital Convenience**, allowing the city layer to distinguish a dense catalogue of places from amenities that are genuinely easy to reach and use.
+The next step is therefore **Phase 7 — ranking rebuild and validation**: test the complete model against known destinations/counterexamples, quantify sensitivity and coverage bias, then decide which newer city/usability fields deserve production ranking weight.
