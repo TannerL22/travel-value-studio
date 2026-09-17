@@ -52,7 +52,7 @@ const scoreLabel = (value: number | null | undefined) => {
 
 export function CityIntelligencePanel({ iso3 }: CityIntelligencePanelProps) {
   const [cities, setCities] = useState<CityRow[]>([]);
-  const [meta, setMeta] = useState<CityResponse["meta"]>(null);
+  const [meta, setMeta] = useState<CityResponse["meta"] | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
 
