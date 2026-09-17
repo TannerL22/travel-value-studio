@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from basic_comfort import add_basic_comfort_v3, apply_basic_comfort_to_ranking
 from data_sources import (
     add_origin_fx_tailwind_diagnostics,
     build_dataset,
@@ -23,8 +24,8 @@ from fx_opportunity import (
     add_fx_opportunity_v2,
     apply_fx_opportunity_to_ranking,
 )
-from model_contract import phase_2_methodology
-from phase2_registry import get_phase2_source_registry
+from model_contract import phase_3_methodology
+from phase3_registry import get_phase3_source_registry
 from source_registry import get_methodology_summary
 
 
@@ -112,12 +113,12 @@ def get_origins() -> Any:
 
 @app.get("/api/source-registry")
 def get_api_source_registry() -> Any:
-    return get_phase2_source_registry()
+    return get_phase3_source_registry()
 
 
 @app.get("/api/methodology")
 def get_api_methodology() -> Any:
-    return phase_2_methodology(get_methodology_summary())
+    return phase_3_methodology(get_methodology_summary())
 
 
 @app.post("/api/rankings")
@@ -135,6 +136,9 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
         np.clip(0.2 + 0.9 * query.budget_sens + 0.2 * query.comfort, 0.0, 1.5)
     )
 
+    # Legacy score construction is retained for reproducibility. Phase 3 then
+    # reconstructs the production score without the legacy GDP comfort penalty
+    # and replaces it with direct basic-service evidence.
     scored = compute_scores(
         df_raw,
         nominal_penalty_exp=float(alpha),
@@ -146,6 +150,8 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
         arrivals_weight=float(arrivals_weight),
         min_stability=None,
     )
+    scored = add_basic_comfort_v3(scored, target_year=query.year)
+    scored = apply_basic_comfort_to_ranking(scored, comfort_requirement=query.comfort)
 
     origin_pp = origin_context["origin_pp_multiplier"]
     origin_currency = origin_context["origin_currency"]
@@ -154,8 +160,7 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     scored = add_origin_fx_tailwind_diagnostics(scored, origin_currency)
     scored = promote_origin_fx_tailwind_component(scored)
 
-    # Phase 2: 1W / 1M / 3M / 1Y / 3Y bilateral FX timing. The ranking effect
-    # is capped so timing can matter without overwhelming structural value.
+    # Phase 2 timing layer remains downstream of Phase 3 structural comfort.
     scored = add_fx_opportunity_v2(scored, origin_currency)
     scored = apply_fx_opportunity_to_ranking(scored)
 
@@ -165,7 +170,6 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
         scored["structural_purchasing_power"] - 1.0
     ) * 100.0
 
-    scored["basic_comfort"] = scored["component_comfort_floor"]
     scored["service_depth"] = scored["component_tourism_depth"]
     scored["stability"] = scored["component_safety_stability"]
     scored["quality_adjusted_value"] = scored["component_overall_value"]
@@ -181,10 +185,12 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     meta["origin_fallback_used"] = origin_context["origin_fallback_used"]
     meta["origin_pp_multiplier"] = float(origin_context["origin_pp_multiplier"])
     meta["origin_currency"] = origin_currency
-    meta["model_contract"] = "phase_2_quality_adjusted_purchasing_power_fx_v2"
+    meta["model_contract"] = "phase_3_quality_adjusted_purchasing_power_basic_comfort"
     meta["daily_cost_estimate_removed"] = True
     meta["fx_opportunity_horizons"] = ["1w", "1m", "3m", "1y", "3y"]
     meta["fx_opportunity_max_ranking_effect"] = FX_MAX_RANKING_EFFECT
+    meta["basic_comfort_pillars"] = ["water", "sanitation", "electricity", "internet", "health"]
+    meta["basic_comfort_legacy_gdp_proxy_is_fallback_only"] = True
 
     if include_meta:
         return {"meta": meta, "results": results}
