@@ -19,20 +19,12 @@ type SourceField = {
   recommended_confidence: string;
 };
 
-type ComponentMetadata = {
-  label: string;
-  current_definition: string;
-  measures: string;
-  caveat: string;
-};
-
 type MethodologySummary = {
-  thesis: string;
-  current_model_status: string;
-  known_limitations: string[];
-  component_fields: string[];
-  data_quality_fields: string[];
-  components: Record<string, ComponentMetadata>;
+  current_model_status?: string;
+  known_limitations?: string[];
+  product_question?: string;
+  target_user?: string;
+  scope?: string;
 };
 
 type MethodologyPanelProps = {
@@ -42,23 +34,26 @@ type MethodologyPanelProps = {
 };
 
 const priorityFields = [
+  "fx_opportunity",
+  "fx_opportunity_multiplier",
+  "fx_opportunity_1w_pct",
+  "fx_opportunity_1m_pct",
+  "fx_opportunity_3m_pct",
+  "fx_opportunity_1y_pct",
+  "fx_opportunity_3y_pct",
   "ppp_private_lcu_per_int",
   "tourism_pp_power",
-  "fx_lcu_per_usd",
-  "fx_tailwind_recent_ratio",
-  "fx_tailwind_signal",
   "intl_arrivals",
   "wgi_political_stability",
-  "currency",
 ];
 
-const phaseOneComponents = [
-  ["Structural purchasing power", "Broad destination purchasing power relative to the selected origin. It is an index, not a personal daily-budget estimate."],
-  ["FX opportunity", "Existing origin-aware 1Y/3Y FX signal. Phase 2 will add shorter horizons and make FX opportunity directly affect ranking."],
-  ["Basic comfort", "The current GDP-PPP comfort floor, relabelled as a temporary proxy until direct basic-services data replace it."],
-  ["Service depth", "The current tourism-depth signal, relabelled as a temporary usability proxy. It is still mainly driven by arrivals."],
+const phaseTwoComponents = [
+  ["Structural purchasing power", "Broad destination purchasing power relative to the selected origin. It remains the structural cheapness layer rather than a personal daily-budget estimate."],
+  ["FX opportunity", "Production bilateral timing signal across 1W, 1M, 3M, 1Y, and 3Y. Positive moves mean the selected origin currency buys more destination currency than at the reference date."],
+  ["Basic comfort", "The current GDP-PPP comfort floor remains a temporary proxy until Phase 3 replaces it with direct basic-services data."],
+  ["Service depth", "The current tourism-depth signal remains mainly arrivals-driven until Phase 4 replaces it with measured amenity and service supply."],
   ["Stability", "The current WGI-led political-stability signal. It should not be read as a complete crime or personal-safety measure."],
-  ["Quality-adjusted value", "The current production score. Phase 1 changes semantics and outputs; it deliberately does not redesign the score."],
+  ["Quality-adjusted value", "The production structural score after a bounded FX timing overlay. FX can move rankings, but its effect is capped so timing cannot overwhelm underlying value."],
 ] as const;
 
 export function MethodologyPanel({ apiUrl, isOpen, onClose }: MethodologyPanelProps) {
@@ -86,7 +81,7 @@ export function MethodologyPanel({ apiUrl, isOpen, onClose }: MethodologyPanelPr
     const priority = priorityFields.map((field) => sourceRegistry[field]).filter((field): field is SourceField => Boolean(field));
     const prioritySet = new Set(priorityFields);
     const remaining = Object.values(sourceRegistry).filter((field) => !prioritySet.has(field.field_name));
-    return [...priority, ...remaining].slice(0, 12);
+    return [...priority, ...remaining].slice(0, 14);
   }, [sourceRegistry]);
 
   return (
@@ -96,8 +91,8 @@ export function MethodologyPanel({ apiUrl, isOpen, onClose }: MethodologyPanelPr
           <motion.div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl" initial={{ y: 28, scale: 0.98 }} animate={{ y: 0, scale: 1 }} exit={{ y: 28, scale: 0.98 }} onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Methodology · Phase 1</p>
-                <h2 className="mt-1 text-xl font-semibold text-white">Where does my foreign currency buy the most usable quality of life?</h2>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Methodology · Phase 2</p>
+                <h2 className="mt-1 text-xl font-semibold text-white">Where does my foreign currency buy the most usable quality of life right now?</h2>
               </div>
               <Button type="button" variant="outline" size="icon-sm" className="border-white/10 bg-white/5 text-zinc-300" onClick={onClose} aria-label="Close methodology"><X className="h-4 w-4" /></Button>
             </div>
@@ -113,19 +108,19 @@ export function MethodologyPanel({ apiUrl, isOpen, onClose }: MethodologyPanelPr
                       <div>
                         <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-200">Product question</h3>
                         <p className="mt-2 text-sm leading-6 text-zinc-300">
-                          Travel Value Studio screens destinations for a globally mobile person who holds or earns in a foreign currency and may spend several weeks or months abroad. It asks where broad local prices are cheap in that currency, then applies adjustable penalties for weak comfort, service depth, and stability. Airfare and travel time are intentionally outside scope.
+                          {methodology?.product_question ?? "Where does the foreign currency I hold buy the most usable quality of day-to-day life, and where is the FX timing unusually attractive right now?"}
                         </p>
                         <p className="mt-3 text-xs leading-5 text-zinc-500">
-                          Phase 1 removes the old home-daily-budget anchor and stops presenting macro purchasing power as an estimated daily trip cost. The underlying production ranking formula is otherwise unchanged.
+                          Phase 2 keeps airfare and travel time outside scope. It adds bilateral FX timing directly to ranking while preserving structural purchasing power as the dominant layer.
                         </p>
                       </div>
                     </div>
                   </section>
 
                   <section>
-                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-zinc-300">Phase 1 component contract</h3>
+                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-zinc-300">Phase 2 component contract</h3>
                     <div className="grid gap-3 md:grid-cols-2">
-                      {phaseOneComponents.map(([label, description]) => (
+                      {phaseTwoComponents.map(([label, description]) => (
                         <div key={label} className="rounded-lg border border-white/10 bg-white/5 p-4">
                           <p className="text-sm font-semibold text-white">{label}</p>
                           <p className="mt-2 text-xs leading-5 text-zinc-400">{description}</p>
@@ -134,13 +129,22 @@ export function MethodologyPanel({ apiUrl, isOpen, onClose }: MethodologyPanelPr
                     </div>
                   </section>
 
+                  <section className="rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-5">
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">FX Opportunity logic</h3>
+                    <p className="mt-2 text-xs leading-5 text-zinc-300">
+                      The model compares the current destination/origin currency cross with roughly 1-week, 1-month, 3-month, 1-year, and 3-year reference points. Each move is scaled to its horizon, combined into a -1 to +1 timing signal, and converted to a 0-100 FX score.
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-zinc-500">
+                      The ranking multiplier is capped at ±15% by default. This is deliberate: a sudden currency move should matter, but it should not make poor structural purchasing power, comfort, or service depth irrelevant.
+                    </p>
+                  </section>
+
                   <section>
                     <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-zinc-300">Current limitations</h3>
                     <div className="grid gap-2 md:grid-cols-2">
-                      <div className="rounded-lg border border-white/10 bg-zinc-950/50 p-3 text-xs leading-5 text-zinc-400">Private-consumption PPP is broad household consumption, not a furnished-rental or expat basket.</div>
-                      <div className="rounded-lg border border-white/10 bg-zinc-950/50 p-3 text-xs leading-5 text-zinc-400">Basic comfort is still approximated from GDP PPP rather than direct water, sanitation, electricity, connectivity, and health data.</div>
-                      <div className="rounded-lg border border-white/10 bg-zinc-950/50 p-3 text-xs leading-5 text-zinc-400">Service depth is still mainly an arrivals proxy and does not yet measure restaurants, housing, transit, amenities, or digital convenience directly.</div>
-                      <div className="rounded-lg border border-white/10 bg-zinc-950/50 p-3 text-xs leading-5 text-zinc-400">Origin-aware FX is displayed but does not yet directly re-order the production score. That is Phase 2.</div>
+                      {(methodology?.known_limitations ?? []).map((limitation) => (
+                        <div key={limitation} className="rounded-lg border border-white/10 bg-zinc-950/50 p-3 text-xs leading-5 text-zinc-400">{limitation}</div>
+                      ))}
                     </div>
                   </section>
 
