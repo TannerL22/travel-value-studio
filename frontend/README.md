@@ -4,9 +4,9 @@ Next.js application for Travel Value Studio.
 
 ## Frontend v2 status
 
-**Phase 9 — Mobile, Responsive & Accessibility Hardening: implemented.**
+**Phase 10 — Visual Polish, Performance & Final Product QA: implemented.**
 
-The frontend is being rebuilt around a product architecture rather than the original model-debugging dashboard.
+The frontend has been rebuilt around a product architecture rather than the original model-debugging dashboard.
 
 ### Phase 1 foundation
 
@@ -93,30 +93,37 @@ Phase 9 keeps the Phase 1–8 information architecture and hardens behavior acro
 
 Key changes:
 
-- The global shell now includes a visible-on-focus **Skip to main content** link and the header becomes a two-row mobile layout rather than forcing brand + three navigation links into one narrow row.
+- The global shell includes a visible-on-focus **Skip to main content** link and the header becomes a two-row mobile layout rather than forcing brand + three navigation links into one narrow row.
 - Touch targets for primary actions, modal controls, comparison chips and country-detail actions are approximately 44px-class minimums.
 - `hooks/useModalDialog.ts` centralizes accessible modal behavior: initial focus, focus trapping, Escape-to-close, body-scroll lock and restoration of the previously focused control.
 - Preferences and the mobile map use that same dialog behavior. The mobile map also respects safe-area insets.
 - The map no longer creates a separate Tab stop for every country. It uses a single **roving keyboard focus** ordered by destination rank; arrow keys move focus and Enter/Space opens the destination. The ranked list remains the primary non-map alternative.
-- Destination-result and mobile-map Framer Motion transitions respect `prefers-reduced-motion`; global CSS also collapses residual animation/transition duration for reduced-motion users.
-- Discover, Country, Compare and Methodology now expose persistent inline loading/error/empty states with `aria-live`, `aria-busy`, `role=status` or `role=alert` as appropriate instead of relying on transient toast feedback or visually blank output.
-- Comparison remains horizontally scrollable on narrow screens, but the table is now a named keyboard-focusable region with table caption/scope semantics and a mobile swipe hint.
+- Reduced-motion users do not depend on animation for information; residual CSS transition/animation duration is collapsed by the global reduced-motion rule.
+- Discover, Country, Compare and Methodology expose persistent inline loading/error/empty states with `aria-live`, `aria-busy`, `role=status` or `role=alert` as appropriate instead of relying on transient toast feedback or visually blank output.
+- Comparison remains horizontally scrollable on narrow screens, but the table is a named keyboard-focusable region with table caption/scope semantics and a mobile swipe hint.
 - Country/city detail and comparison surfaces received targeted contrast and small-text improvements while preserving the dark visual system.
 - Dynamic viewport units (`dvh`), overscroll containment and safe-area padding are used where full-height mobile overlays or independently scrolling panels need them.
 
-Phase 9 acceptance targets are:
+### Phase 10 visual polish, performance & final product QA
 
-```text
-375px phone       no structural horizontal page overflow; rankings first; map/dialog usable
-430px phone       same interaction model with comfortable touch targets
-Tablet            responsive stacked/grid layouts with no fixed-sidebar assumptions
-Laptop/Desktop    synchronized map/list and independent list scrolling retained
-Keyboard          skip link, visible focus, modal focus trap, map roving focus, table scrolling
-Reduced motion    no required information depends on animation
-Loading/Error     meaningful persistent state on every primary route
-```
+Phase 10 retains the product architecture and removes the remaining model-dashboard visual signatures.
 
-This is a code/CI acceptance contract. Final visual polish, spacing normalization, performance tuning and cross-device product QA remain Phase 10.
+Key changes:
+
+- Header, Discover controls, country context, comparison context and methodology use a quieter sentence-case hierarchy with fewer uppercase micro-labels.
+- The preference summary is one contextual strip rather than a row of small cards.
+- Destination results are flatter and denser; condition scores are plain context rather than pills and backend ranking drivers remain the only explanatory effects.
+- Country detail is more editorial: lighter hero, one restrained image, flatter ranking-driver/current-value/living-foundation sections, and explicit housing scope without a card-inside-card treatment.
+- Comparison and methodology use dividers/sequence structure where possible instead of repeated boxed surfaces.
+- `DestinationResult` is memoized and uses stable callbacks so map/list hover state does not needlessly rerender every destination card.
+- Live Discover code no longer imports Framer Motion; simple CSS interaction states are sufficient for the product.
+- The D3 world map is dynamically imported and the desktop copy is mounted only at desktop widths. On smaller screens the map chunk is not mounted until the user explicitly opens Map.
+- The country-image proxy now returns a stable cache shape, prefers a smaller Pexels `large` asset over `large2x`, and sends shared/CDN stale-while-revalidate cache headers.
+- A source sweep confirms no return of star ratings, visitor-arrival cards, frontend verdicts, legacy PPP Advantage presentation, frontend-created ranking scores, or comparison winners.
+
+Detailed Phase 10 QA and release findings are recorded in `../docs/FRONTEND_PHASE_10_QA.md`.
+
+Important: frontend v2 is complete, but the overall product should not be called model-frozen until the documented backend ranking-universe issue is resolved. `/api/rankings` still calls legacy `compute_scores()` before the Phase 7 ranking rebuild, so legacy score prerequisites can potentially affect country inclusion even though they no longer determine final ordering.
 
 ## Commands
 
