@@ -17,7 +17,7 @@ jobs:
       - name: Install backend dependencies
         run: pip install -r backend/requirements.txt
       - name: Compile backend
-        run: python -m py_compile backend/main.py backend/data_sources.py backend/source_registry.py backend/model_contract.py backend/fx_opportunity.py backend/phase2_registry.py backend/basic_comfort.py backend/phase3_registry.py backend/service_depth.py backend/phase4_registry.py backend/city_intelligence.py backend/phase5_registry.py backend/mobility_digital.py backend/phase6_registry.py backend/ranking_v7.py backend/phase7_registry.py
+        run: python -m py_compile backend/main.py backend/data_sources.py backend/source_registry.py backend/model_contract.py backend/fx_opportunity.py backend/phase2_registry.py backend/basic_comfort.py backend/phase3_registry.py backend/service_depth.py backend/phase4_registry.py backend/city_intelligence.py backend/phase5_registry.py backend/mobility_digital.py backend/phase6_registry.py backend/ranking_v7.py backend/phase7_registry.py backend/production_ranking.py backend/phase71_universe_checks.py backend/control_sensitivity_checks.py backend/phase71_empirical_audit.py
       - name: Run backend sanity checks
         run: python backend/sanity_checks.py
       - name: Run Phase 2 FX checks
@@ -32,6 +32,10 @@ jobs:
         run: python backend/mobility_digital_checks.py
       - name: Run Phase 7 ranking rebuild checks
         run: python backend/ranking_v7_checks.py
+      - name: Run Phase 7.1 universe integrity checks
+        run: python backend/phase71_universe_checks.py
+      - name: Run Phase 7.1 control sensitivity checks
+        run: python backend/control_sensitivity_checks.py
 
   frontend:
     runs-on: ubuntu-latest
