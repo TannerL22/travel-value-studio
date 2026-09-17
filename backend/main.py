@@ -18,7 +18,7 @@ from mobility_digital import enrich_cities_phase6
 from model_contract import phase_7_methodology
 from phase7_registry import get_phase7_source_registry
 from production_ranking import prepare_country_evidence, prepare_country_identity, rank_prepared_countries
-from ranking_v7 import add_city_usability_v7
+from ranking_v7 import SERVICE_MAX_HAIRCUT, STABILITY_MAX_HAIRCUT, add_city_usability_v7
 from source_registry import get_methodology_summary
 
 
@@ -207,12 +207,17 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     meta["phase71_production_stability_source"] = "World Bank WGI Political Stability direct 0-100 mapping"
     meta["phase7_structural_pp_bounds"] = [1.0 / 3.0, 3.0]
     meta["phase7_stability_priority_zero_is_neutral"] = True
+    meta["phase71_basic_comfort_wash_combination"] = {"basic_access_weight": 0.65, "safely_managed_quality_weight": 0.35}
+    meta["phase71_service_depth_max_haircut"] = SERVICE_MAX_HAIRCUT
+    meta["phase71_stability_max_haircut"] = STABILITY_MAX_HAIRCUT
     meta["fx_opportunity_horizons"] = ["1w", "1m", "3m", "1y", "3y"]
     meta["fx_opportunity_max_ranking_effect"] = FX_MAX_RANKING_EFFECT
     meta["basic_comfort_pillars"] = ["water", "sanitation", "electricity", "internet", "health"]
     meta["basic_comfort_legacy_gdp_proxy_is_fallback_only"] = True
     meta["service_depth_primary_source"] = "WEF TTDI 2024 Tourist Services and Infrastructure"
     meta["service_depth_arrivals_are_fallback_only"] = True
+    meta["service_depth_is_partial_proxy_with_bounded_penalty"] = True
+    meta["stability_is_macro_proxy_with_bounded_penalty"] = True
     meta["city_intelligence_endpoint"] = "/api/cities/{country_iso3}"
     meta["phase6_mobility_source"] = "WEF TTDI 2024 Ground and Port Infrastructure + MobilityDatabase GTFS metadata"
     meta["phase6_digital_source"] = "ITU/WDI + Global Findex 2025 + WEF TTDI 2024 ICT"
