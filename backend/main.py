@@ -28,8 +28,6 @@ class RankingQuery(BaseModel):
     comfort: float = Field(default=0.55, ge=0.0, le=1.0)
     supply_need: float = Field(default=0.65, ge=0.0, le=1.0)
     risk_pri: float = Field(default=0.75, ge=0.0, le=1.0)
-    user_base_spend: float = Field(default=180.0, gt=0)
-    scarcity_k: float = Field(default=0.7, ge=0.0, le=1.0)
 
 
 app = FastAPI(title="Travel Value Studio API")
@@ -90,20 +88,17 @@ def _get_cached_dataset(target_year: int) -> Tuple[pd.DataFrame, Dict[str, Any]]
 
 @app.get("/api/origins")
 def get_origins() -> Any:
-    # Use the current year's dataset to get the list of countries
     df_raw, _ = _get_cached_dataset(target_year=2025)
-    
-    # We want countries that have at least basic data
     valid = df_raw[df_raw["iso3"].notna() & df_raw["country"].notna()].copy()
     valid = valid.sort_values("country")
-    
+
     origins = []
     for _, row in valid.iterrows():
         origins.append({
             "name": row["country"],
             "code": row["iso3"],
             "pp_multiplier": float(row["tourism_pp_power"]) if pd.notna(row["tourism_pp_power"]) else 1.0,
-            "currency": row.get("currency", "USD")
+            "currency": row.get("currency", "USD"),
         })
     return origins
 
@@ -123,7 +118,9 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
     df_raw, meta = _get_cached_dataset(target_year=query.year)
     origin_context = resolve_origin_context(df_raw, query.origin_iso3)
 
-    # Calculate base weights
+    # Phase 1 preserves the production ranking formula while renaming its outputs
+    # to match what the data actually measures. Later phases will rebuild the
+    # component inputs and make origin-aware FX directly affect ranking.
     alpha = 1.0 + 2.2 * query.budget_sens
     ppp_floor = 3000 + 17000 * query.comfort
     floor_strength = 1.0 + 2.0 * query.comfort
@@ -134,7 +131,6 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
         np.clip(0.2 + 0.9 * query.budget_sens + 0.2 * query.comfort, 0.0, 1.5)
     )
 
-    # 1. Calculate absolute value metrics for all countries
     scored = compute_scores(
         df_raw,
         nominal_penalty_exp=float(alpha),
@@ -147,41 +143,40 @@ def get_rankings(query: RankingQuery, include_meta: int = 0) -> Any:
         min_stability=None,
     )
 
-    # 2. Origin-Based Normalization
     origin_pp = origin_context["origin_pp_multiplier"]
     origin_currency = origin_context["origin_currency"]
-
     scored = add_origin_fx_tailwind_diagnostics(scored, origin_currency)
     scored = promote_origin_fx_tailwind_component(scored)
 
-    # Relative Value Power: How much more/less value you get vs home
+    # Broad purchasing power in the destination relative to the selected origin.
+    # This is an index, not an estimate of a personal or tourist daily budget.
     scored["value_multiplier_relative"] = scored["tourism_pp_power"] / origin_pp
+    scored["structural_purchasing_power"] = scored["value_multiplier_relative"]
+    scored["purchasing_power_advantage_pct"] = (
+        scored["structural_purchasing_power"] - 1.0
+    ) * 100.0
 
-    # 3. Cost Estimation
-    arr_scaled = np.log1p(scored["intl_arrivals"].fillna(0).clip(lower=0))
-    arr_scaled = (arr_scaled - arr_scaled.min()) / (arr_scaled.max() - arr_scaled.min() + 1e-9)
-    availability = arr_scaled.clip(0, 1)
-    scored["scarcity_mult"] = 1.0 + float(query.scarcity_k) * (1.0 - availability) * float(query.supply_need)
+    # Phase 1 semantic aliases. The legacy component columns are retained so
+    # historical validation snapshots and downstream analysis remain readable.
+    scored["fx_opportunity"] = scored["component_fx_tailwind"]
+    scored["basic_comfort"] = scored["component_comfort_floor"]
+    scored["service_depth"] = scored["component_tourism_depth"]
+    scored["stability"] = scored["component_safety_stability"]
+    scored["quality_adjusted_value"] = scored["component_overall_value"]
 
-    def est_cost(base_spend: float) -> np.ndarray:
-        vm = scored["value_multiplier_relative"].replace([np.inf, -np.inf], np.nan)
-        # We divide origin spend by the multiplier to get target cost
-        return (base_spend / vm) * scored["scarcity_mult"]
-
-    scored["est_daily_cost"] = est_cost(float(query.user_base_spend))
-
-    # 4. Final Scoring
     scored["rank"] = np.arange(1, len(scored) + 1)
-    scored["Score"] = scored["component_overall_value"]
+    scored["Score"] = scored["quality_adjusted_value"]
 
     top = scored.head(250).replace([np.inf, -np.inf], np.nan)
     results = top.where(top.notna(), None).to_dict(orient="records")
-    
+
     meta["origin_requested"] = origin_context["origin_requested"]
     meta["origin_used"] = origin_context["origin_used"]
     meta["origin_fallback_used"] = origin_context["origin_fallback_used"]
     meta["origin_pp_multiplier"] = float(origin_context["origin_pp_multiplier"])
     meta["origin_currency"] = origin_currency
+    meta["model_contract"] = "phase_1_quality_adjusted_purchasing_power"
+    meta["daily_cost_estimate_removed"] = True
 
     if include_meta:
         return {"meta": meta, "results": results}
