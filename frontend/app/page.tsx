@@ -5,10 +5,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { ArrowRight, BookOpen, Globe, LayoutGrid, Plus, X } from "lucide-react";
 
-import { ControlPanel } from "@/components/ControlPanel";
 import { DestinationCard } from "@/components/DestinationCard";
 import { DestinationModal } from "@/components/DestinationModal";
 import { MethodologyPanel } from "@/components/MethodologyPanel";
+import { PreferenceBar } from "@/components/preferences/PreferenceBar";
+import { PreferenceDrawer } from "@/components/preferences/PreferenceDrawer";
 import { AppShell } from "@/components/shell/AppShell";
 import { WorldMap } from "@/components/WorldMap";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ export default function Home() {
   const [compareList, setCompareList] = useState<RankingRow[]>([]);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false);
+  const [isPreferenceOpen, setIsPreferenceOpen] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<RankingRow | null>(null);
 
   const { origins, error: originsError } = useOrigins();
@@ -164,7 +166,7 @@ export default function Home() {
       </div>
 
       <div className="mb-8">
-        <ControlPanel values={filters} setValues={setFilters} origins={origins} />
+        <PreferenceBar values={filters} origins={origins} onOpen={() => setIsPreferenceOpen(true)} />
       </div>
 
       <AnimatePresence mode="wait">
@@ -258,6 +260,14 @@ export default function Home() {
       <AnimatePresence>
         {isCompareOpen && compareList.length >= 2 ? <ComparisonPanel countries={compareList} imageMap={imageMap} onClose={() => setIsCompareOpen(false)} onRemove={toggleCompare} /> : null}
       </AnimatePresence>
+
+      <PreferenceDrawer
+        isOpen={isPreferenceOpen}
+        values={filters}
+        setValues={setFilters}
+        origins={origins}
+        onClose={() => setIsPreferenceOpen(false)}
+      />
 
       <MethodologyPanel apiUrl={apiUrl} isOpen={isMethodologyOpen} onClose={() => setIsMethodologyOpen(false)} />
     </AppShell>
