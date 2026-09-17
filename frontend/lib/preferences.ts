@@ -86,8 +86,8 @@ export function preferenceLevel(key: PreferenceKey, value: number): string {
     return "Very high";
   }
 
-  if (normalized <= 0.2) return "Low";
-  if (normalized <= 0.45) return "Balanced";
+  if (normalized <= 0.2) return "Balanced";
+  if (normalized <= 0.45) return "Moderate";
   if (normalized <= 0.7) return "High";
   if (normalized <= 0.9) return "Very high";
   return "Maximum";
