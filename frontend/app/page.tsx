@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { BookOpen, GitCompareArrows, Map, X } from "lucide-react";
 
 import { RankingList } from "@/components/discover/RankingList";
-import { MethodologyPanel } from "@/components/MethodologyPanel";
 import { PreferenceBar } from "@/components/preferences/PreferenceBar";
 import { PreferenceDrawer } from "@/components/preferences/PreferenceDrawer";
 import { AppShell } from "@/components/shell/AppShell";
@@ -17,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Toaster } from "@/components/ui/sonner";
 import { useOrigins } from "@/hooks/useOrigins";
 import { useRankings } from "@/hooks/useRankings";
-import { apiUrl } from "@/lib/api";
 import { DEFAULT_FILTERS, parsePreferences, preferencesToSearchParams } from "@/lib/preferences";
 import type { FilterState, RankingRow } from "@/lib/types";
 
@@ -28,7 +26,6 @@ export default function Home() {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [urlHydrated, setUrlHydrated] = useState(false);
   const [sortBy, setSortBy] = useState<"value" | "purchasing_power" | "stability">("value");
-  const [isMethodologyOpen, setIsMethodologyOpen] = useState(false);
   const [isPreferenceOpen, setIsPreferenceOpen] = useState(false);
   const [isMobileMapOpen, setIsMobileMapOpen] = useState(false);
   const [hoveredCountryKey, setHoveredCountryKey] = useState<string | null>(null);
@@ -92,20 +89,19 @@ export default function Home() {
     setHoveredCountryKey(country ? countryKey(country) : null);
   };
 
+  const preferenceQuery = () => preferencesToSearchParams(filters).toString();
+
   const openCountry = (country: RankingRow) => {
     const code = country.iso3?.toUpperCase();
     if (!code) {
       toast.error("This destination does not have a country code for detail navigation.");
       return;
     }
-    const params = preferencesToSearchParams(filters).toString();
-    router.push(`/country/${code}?${params}`);
+    router.push(`/country/${code}?${preferenceQuery()}`);
   };
 
-  const openCompare = () => {
-    const params = preferencesToSearchParams(filters).toString();
-    router.push(`/compare?${params}`);
-  };
+  const openCompare = () => router.push(`/compare?${preferenceQuery()}`);
+  const openMethodology = () => router.push(`/methodology?${preferenceQuery()}`);
 
   const handleMobileMapSelect = (country: RankingRow) => {
     setIsMobileMapOpen(false);
@@ -128,7 +124,7 @@ export default function Home() {
           <Button type="button" variant="outline" className="h-10 border-white/10 bg-zinc-950/60 px-3 text-xs uppercase tracking-[0.16em] text-zinc-200" onClick={openCompare}>
             <GitCompareArrows className="h-3.5 w-3.5" /> Compare
           </Button>
-          <Button type="button" variant="outline" className="h-10 border-white/10 bg-zinc-950/60 px-3 text-xs uppercase tracking-[0.16em] text-zinc-200" onClick={() => setIsMethodologyOpen(true)}>
+          <Button type="button" variant="outline" className="h-10 border-white/10 bg-zinc-950/60 px-3 text-xs uppercase tracking-[0.16em] text-zinc-200" onClick={openMethodology}>
             <BookOpen className="h-3.5 w-3.5" /> Method
           </Button>
           <Button type="button" variant="outline" className="h-10 gap-2 border-white/10 bg-zinc-950/60 px-3 text-xs uppercase tracking-[0.16em] text-zinc-200 lg:hidden" onClick={() => setIsMobileMapOpen(true)}>
@@ -151,12 +147,7 @@ export default function Home() {
 
       <section className="hidden gap-5 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(360px,2fr)] lg:items-start">
         <div className="sticky top-5 min-w-0">
-          <WorldMap
-            results={results}
-            activeCountryKey={hoveredCountryKey}
-            onCountryHover={handleCountryHover}
-            onCountryClick={openCountry}
-          />
+          <WorldMap results={results} activeCountryKey={hoveredCountryKey} onCountryHover={handleCountryHover} onCountryClick={openCountry} />
           <div className="mt-3 flex items-center justify-between gap-4 px-1 text-xs text-zinc-600">
             <span>Map color always represents Quality-Adjusted Value.</span>
             <span>{results.length ? `${results.length} destinations` : ""}</span>
@@ -171,69 +162,31 @@ export default function Home() {
             </div>
           </div>
           <div className="max-h-[calc(100vh-7rem)] overflow-y-auto pr-2 [scrollbar-color:#3f3f46_transparent] [scrollbar-width:thin]">
-            <RankingList
-              results={sortedResults}
-              loading={loading}
-              activeCountryKey={hoveredCountryKey}
-              onCountryHover={handleCountryHover}
-              onCountrySelect={openCountry}
-              compact
-              skeletonCount={6}
-            />
+            <RankingList results={sortedResults} loading={loading} activeCountryKey={hoveredCountryKey} onCountryHover={handleCountryHover} onCountrySelect={openCountry} compact skeletonCount={6} />
           </div>
         </div>
       </section>
 
       <section className="lg:hidden">
-        <RankingList
-          results={sortedResults}
-          loading={loading}
-          activeCountryKey={hoveredCountryKey}
-          onCountryHover={handleCountryHover}
-          onCountrySelect={openCountry}
-          skeletonCount={7}
-        />
+        <RankingList results={sortedResults} loading={loading} activeCountryKey={hoveredCountryKey} onCountryHover={handleCountryHover} onCountrySelect={openCountry} skeletonCount={7} />
       </section>
 
       <AnimatePresence>
         {isMobileMapOpen ? (
-          <motion.div
-            className="fixed inset-0 z-[65] flex flex-col bg-zinc-950 lg:hidden"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
+          <motion.div className="fixed inset-0 z-[65] flex flex-col bg-zinc-950 lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Discovery map</p>
-                <p className="mt-1 text-sm font-semibold text-white">Quality-Adjusted Value</p>
-              </div>
-              <button type="button" onClick={() => setIsMobileMapOpen(false)} className="rounded-full border border-white/10 bg-white/5 p-2 text-zinc-300" aria-label="Close map">
-                <X className="h-4 w-4" />
-              </button>
+              <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Discovery map</p><p className="mt-1 text-sm font-semibold text-white">Quality-Adjusted Value</p></div>
+              <button type="button" onClick={() => setIsMobileMapOpen(false)} className="rounded-full border border-white/10 bg-white/5 p-2 text-zinc-300" aria-label="Close map"><X className="h-4 w-4" /></button>
             </div>
             <div className="flex flex-1 items-center px-3 py-4 sm:px-5">
-              <WorldMap
-                results={results}
-                activeCountryKey={hoveredCountryKey}
-                onCountryHover={handleCountryHover}
-                onCountryClick={handleMobileMapSelect}
-              />
+              <WorldMap results={results} activeCountryKey={hoveredCountryKey} onCountryHover={handleCountryHover} onCountryClick={handleMobileMapSelect} />
             </div>
             <div className="border-t border-white/10 px-4 py-3 text-center text-xs text-zinc-500">Select a country to open its full value analysis.</div>
           </motion.div>
         ) : null}
       </AnimatePresence>
 
-      <PreferenceDrawer
-        isOpen={isPreferenceOpen}
-        values={filters}
-        setValues={setFilters}
-        origins={origins}
-        onClose={() => setIsPreferenceOpen(false)}
-      />
-
-      <MethodologyPanel apiUrl={apiUrl} isOpen={isMethodologyOpen} onClose={() => setIsMethodologyOpen(false)} />
+      <PreferenceDrawer isOpen={isPreferenceOpen} values={filters} setValues={setFilters} origins={origins} onClose={() => setIsPreferenceOpen(false)} />
     </AppShell>
   );
 }
