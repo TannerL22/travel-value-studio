@@ -6,7 +6,7 @@ Phase 7 is the point where the project stops adding dimensions and rebuilds the 
 
 The core question is:
 
-> **Does the final model reward genuine foreign-currency purchasing power that is actually usable, without letting legacy macro proxies, missing-data patterns, or a single flashy dimension dominate the answer?**
+> **Does the final model reward genuine foreign-currency purchasing power that is actually usable, without letting legacy macro proxies, missing-data patterns, or a single partial dimension dominate the answer?**
 
 ## Major Phase 7 decision: remove the legacy GDP-led production base
 
@@ -22,7 +22,9 @@ From Phase 7 onward, the production country score is anchored directly to:
 
 where `tourism_pp_power = market FX / private-consumption PPP`.
 
-The legacy score is retained in `legacy_score_pre_phase7` for auditability, but it no longer drives production ordering.
+Phase 7.1 also removes the legacy scorer as a country-universe gate. The old scorer now runs only on a separate audit copy and its prefixed fields are left-joined back by ISO3. A destination can therefore rank without a valid legacy GDP-led score as long as the production Phase 7 evidence can score it.
+
+The legacy score is retained in `legacy_score_pre_phase7` for auditability, but it no longer drives production ordering or inclusion.
 
 ## Structural value factor
 
@@ -40,40 +42,63 @@ Unlike the old cross-sectional min-max score, the factor does not change simply 
 
 Basic Comfort, Service Depth and Stability are no longer entangled inside a legacy multiplicative score.
 
-Each is an explicit 0–1 shortfall multiplier.
+Each is an explicit 0–1 shortfall multiplier. Phase 7.1 distinguishes direct living-foundation evidence from partial proxy dimensions so that the authority of each penalty matches the evidence behind it.
 
 ### Basic Comfort
 
-Retains the Phase 3 logic:
+Basic Comfort remains the strongest shortfall dimension because its inputs directly describe basic living foundations: water, sanitation, electricity, internet and healthcare access.
+
+For water and sanitation, Phase 7.1 corrects the treatment of World Bank/JMP nested standards:
+
+- **at-least-basic access** is the foundation of each pillar;
+- **safely-managed access** is a stricter quality/reliability uplift rather than a replacement for basic access;
+- when both are available, the pillar is 65% basic access and 35% safely-managed quality;
+- if only one standard is available, the observed score is retained with lower evidence reliability rather than treating the missing standard as zero.
+
+The preference penalty retains the Phase 3 requirement curve:
 
 - requirement threshold rises from 55 to 90;
 - destinations above the selected threshold receive no extra reward;
 - lower scores receive a stronger penalty as Comfort Requirement rises;
 - direct-data coverage controls how much of the penalty can be applied.
 
+Because these inputs are directly relevant to basic liveability, Basic Comfort is not given the proxy haircut cap used below.
+
 ### Service Depth
 
-Retains the Phase 4 logic:
+Service Depth uses WEF TTDI 2024 **Tourist Services and Infrastructure** as the preferred comparable source, with arrivals per capita only as a lower-confidence fallback.
 
-- threshold rises from 35 to 75;
-- high supply is a floor-clearing condition rather than an unlimited rich-market bonus;
-- arrivals fallback has lower evidence coverage, therefore lower penalty authority.
+Phase 7.1 explicitly treats WEF Tourist Services as a useful but incomplete proxy for the broader product concept of established everyday services. Its ranking authority is therefore bounded:
+
+- preference threshold rises from **25 to 55**;
+- the penalty curve is deliberately smoother than before;
+- even at Service Requirement = 1 with full evidence, Service Depth alone can reduce the total pre-FX score by at most **45%**;
+- arrivals fallback still has lower evidence coverage and therefore less penalty authority;
+- the public verbatim copy of the WEF dataset is provenance-labelled and receives 0.90 evidence coverage when the first-party XLSX cannot be retrieved.
+
+High service depth remains a floor-clearing condition rather than an unlimited rich-market bonus.
 
 ### Stability
 
-Phase 7 fixes an important semantic issue in the original model:
+Phase 7.1 uses **World Bank WGI Political Stability** directly. It does not reuse the old blended “safety” component.
 
-> **Stability Priority = 0 now means exactly ignore stability.**
+> **Stability Priority = 0 means exactly ignore stability.**
 
-The previous prototype always retained a small stability exponent. Phase 7 instead applies a shortfall multiplier only in proportion to the selected priority and only when observed WGI evidence exists.
+The production WGI score is mapped from the WGI -2.5 to +2.5 scale onto 0–100. The preference threshold rises from **40 to 70**. Because WGI Political Stability is a macro political-risk signal rather than a complete traveller crime/personal-safety measure:
 
-Missing stability evidence remains neutral and is surfaced through provenance/quality flags.
+- the curve is smoother than the original Phase 7 implementation;
+- even at Stability Priority = 1 with full evidence, this dimension alone can reduce the total pre-FX score by at most **45%**;
+- missing WGI evidence has zero penalty authority and is exactly neutral.
+
+This preserves a meaningful distinction for users who care strongly about political stability without allowing one macro proxy to act as a destination veto.
 
 ## FX Opportunity remains bounded and last
 
 The Phase 2 bilateral 1W / 1M / 3M / 1Y / 3Y FX Opportunity overlay is retained.
 
 It runs after structural purchasing power and usability penalties and remains hard-capped at the configured maximum effect (15% by default).
+
+Phase 7.1 also repairs destination/origin currency mapping with local ISO territory metadata, using network lookup only as fallback, so a third-party country-metadata outage cannot silently neutralize FX Opportunity globally.
 
 This preserves the intended distinction:
 
@@ -90,7 +115,7 @@ Then:
 
 `final_score = score × bounded_fx_opportunity_multiplier`
 
-Quality-Adjusted Value is the final score normalized to 0–100 across the current country universe.
+Quality-Adjusted Value is the final score normalized to 0–100 across the current scoreable country universe.
 
 The normalization is useful for discovery but should not be interpreted as an absolute utility scale.
 
@@ -137,20 +162,36 @@ City Usability:
 
 ## Validation invariants
 
-`backend/ranking_v7_checks.py` enforces the following model properties:
+`backend/ranking_v7_checks.py`, `backend/phase71_universe_checks.py` and `backend/control_sensitivity_checks.py` enforce the following model properties:
 
 1. Structural Purchasing Power is monotonic and saturates at the configured bounds.
 2. 1.0x origin-relative purchasing power is exactly neutral.
 3. Stability Priority zero is exactly neutral.
 4. Missing stability evidence cannot create a penalty.
-5. High Comfort and Service requirements can overturn a superficially cheaper but unusable destination.
-6. Legacy GDP values and the legacy score cannot affect Phase 7 ordering when current Phase 7 evidence is identical.
-7. Cheapness Priority changes the strength, not the direction, of the purchasing-power signal.
-8. City Usability requires city Amenity Depth.
-9. Missing Mobility/Digital evidence reduces coverage rather than forcing City Usability to zero.
-10. City Usability ordering responds monotonically to stronger observed usability evidence.
+5. Service Depth and Stability have explicit maximum-haircut floors so neither partial proxy can become a single-factor veto.
+6. High Comfort and Service requirements can still overturn a superficially cheaper but unusable destination.
+7. Legacy GDP values and the legacy score cannot affect Phase 7 ordering when current Phase 7 evidence is identical.
+8. Legacy-score availability cannot determine the production country universe.
+9. Cheapness Priority changes the strength, not the direction, of the purchasing-power signal.
+10. Water/sanitation basic access is not erased by a stricter safely-managed observation.
+11. City Usability requires city Amenity Depth.
+12. Missing Mobility/Digital evidence reduces coverage rather than forcing City Usability to zero.
+13. City Usability ordering responds monotonically to stronger observed usability evidence.
 
 These are structural tests rather than claims that any particular country "should" occupy a specific rank.
+
+## Empirical control-sensitivity audit
+
+`backend/phase71_empirical_audit.py` runs the production evidence and ranking path against live/current source pulls. It reports:
+
+- production-universe counts and legacy-score independence;
+- currency, FX, WGI, Basic Comfort and Service Depth coverage;
+- baseline rankings for multiple origin currencies;
+- full 0→1 control endpoint sensitivity;
+- practical ±0.20 control sensitivity around the default settings;
+- evidence-level face-validity diagnostics for selected destinations.
+
+The empirical audit is intentionally diagnostic rather than a target-fitting exercise. Calibration changes should be justified by what an input actually measures and by pathological sensitivity, not by forcing a preferred country ordering.
 
 ## Validation philosophy
 
@@ -181,20 +222,24 @@ WEF provides useful comparable national transport context, while MobilityDatabas
 
 WGI political stability remains a macro signal. A proper traveller-relevant safety layer would need more direct violence/crime evidence with careful geographic and reporting-bias treatment.
 
+### Service breadth
+
+WEF Tourist Services and Infrastructure is a tourism-supply pillar, not a comprehensive index of retail, healthcare, logistics, consumer services and institutional convenience. Phase 7.1 bounds its ranking authority for this reason, but a broader direct service-depth dataset remains a future upgrade.
+
 ### City search breadth
 
 The city candidate pool is bounded for cost/performance. It can still miss smaller high-usability cities.
 
 ## Phase 7 production contract
 
-The intended production architecture after Phase 7 is therefore:
+The intended production architecture after Phase 7.1 is therefore:
 
 **Country discovery**
 
-Structural Purchasing Power → Basic Comfort shortfall → Service Depth shortfall → Stability shortfall → bounded FX Opportunity → Quality-Adjusted Value
+Structural Purchasing Power → Basic Comfort shortfall → bounded Service Depth shortfall → bounded Stability shortfall → bounded FX Opportunity → Quality-Adjusted Value
 
 **City drill-down**
 
 Amenity Depth + Mobility context + Digital Convenience → City Usability + evidence coverage
 
-This preserves interpretability and data honesty while leaving clear upgrade paths for direct housing, safety and city-specific transport data.
+This preserves interpretability and data honesty while leaving clear upgrade paths for direct housing, safety, broader services and city-specific transport data.
