@@ -11,15 +11,26 @@ export function useCities(countryIso3?: string | null, enabled = true) {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     if (!enabled || !countryIso3) {
-      setData({ results: [] });
-      return;
+      void Promise.resolve().then(() => {
+        if (!active) return;
+        setData({ results: [] });
+        setLoading(false);
+        setError(null);
+      });
+      return () => {
+        active = false;
+      };
     }
 
     const controller = new AbortController();
-    let active = true;
-    setLoading(true);
-    setError(null);
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      setLoading(true);
+      setError(null);
+    });
 
     fetchCities(countryIso3, controller.signal)
       .then((response) => {
