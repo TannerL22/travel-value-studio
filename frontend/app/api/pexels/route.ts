@@ -14,7 +14,16 @@ type PexelsSearchResponse = {
   photos?: PexelsPhoto[];
 };
 
-const cache = new Map<string, PexelsPhoto>();
+type CountryImage = {
+  url: string;
+  photographer?: string;
+  photographer_url?: string;
+};
+
+const cache = new Map<string, CountryImage>();
+const responseHeaders = {
+  "Cache-Control": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
+};
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -24,8 +33,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing query" }, { status: 400 });
   }
 
-  if (cache.has(query)) {
-    return NextResponse.json(cache.get(query));
+  const cached = cache.get(query);
+  if (cached) {
+    return NextResponse.json(cached, { headers: responseHeaders });
   }
 
   const apiKey = process.env.PEXELS_API_KEY;
@@ -53,18 +63,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "No results" }, { status: 404 });
   }
 
-  cache.set(query, photo);
+  const resolved: CountryImage = {
+    // `large` is ample for the restrained country-detail panel and avoids paying
+    // for a 2x asset by default. Fall back only when the preferred size is absent.
+    url: photo.src?.large || photo.src?.large2x || photo.src?.original || "",
+    photographer: photo.photographer,
+    photographer_url: photo.photographer_url,
+  };
 
-  return NextResponse.json(
-    {
-      url: photo.src?.large2x || photo.src?.large || photo.src?.original || "",
-      photographer: photo.photographer,
-      photographer_url: photo.photographer_url,
-    },
-    {
-      headers: {
-        "Cache-Control": "public, max-age=86400",
-      },
-    }
-  );
+  if (!resolved.url) {
+    return NextResponse.json({ error: "No usable image" }, { status: 404 });
+  }
+
+  cache.set(query, resolved);
+  return NextResponse.json(resolved, { headers: responseHeaders });
 }
