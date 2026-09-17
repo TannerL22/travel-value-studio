@@ -127,6 +127,45 @@ def test_service_depth_is_preference_independent() -> None:
     assert high.iloc[0]["service_depth_penalty"] < low.iloc[0]["service_depth_penalty"]
 
 
+def test_data_quality_uses_phase4_evidence_not_arrivals_presence() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "iso3": "AAA",
+                "data_quality_score": 75,
+                "data_quality_grade": "B",
+                "data_quality_flags": ["missing_arrivals", "missing_stability"],
+                "service_depth_source": "wef_ttdi_2024_tourist_services",
+                "service_depth_flags": [],
+            },
+            {
+                "iso3": "BBB",
+                "data_quality_score": 90,
+                "data_quality_grade": "A",
+                "data_quality_flags": [],
+                "service_depth_source": "arrivals_per_capita_fallback",
+                "service_depth_flags": ["service_depth_arrivals_fallback"],
+            },
+            {
+                "iso3": "CCC",
+                "data_quality_score": 90,
+                "data_quality_grade": "A",
+                "data_quality_flags": [],
+                "service_depth_source": "unavailable",
+                "service_depth_flags": ["missing_service_depth"],
+            },
+        ]
+    )
+    out = sd.align_data_quality_with_service_depth(frame).set_index("iso3")
+    assert out.loc["AAA", "data_quality_score"] == 85
+    assert "missing_arrivals" not in out.loc["AAA", "data_quality_flags"]
+    assert out.loc["AAA", "data_quality_grade"] == "A"
+    assert out.loc["BBB", "data_quality_score"] == 85
+    assert "service_depth_arrivals_fallback" in out.loc["BBB", "data_quality_flags"]
+    assert out.loc["CCC", "data_quality_score"] == 80
+    assert "missing_service_depth" in out.loc["CCC", "data_quality_flags"]
+
+
 def main() -> None:
     test_ttdi_scale()
     test_arrivals_fallback_is_capped()
@@ -136,6 +175,7 @@ def main() -> None:
     test_high_service_requirement_can_change_order()
     test_missing_evidence_does_not_create_penalty()
     test_service_depth_is_preference_independent()
+    test_data_quality_uses_phase4_evidence_not_arrivals_presence()
     print("Phase 4 service depth checks passed")
 
 
