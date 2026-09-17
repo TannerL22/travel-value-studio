@@ -14,13 +14,15 @@ Phase 3 uses five country-level pillars:
 
 | Pillar | Preferred source | Indicator | Weight |
 | --- | --- | --- | ---: |
-| Drinking water | WHO/UNICEF JMP via World Bank WDI | `SH.H2O.SMDW.ZS` | 25% |
-| Sanitation | WHO/UNICEF JMP via World Bank WDI | `SH.STA.SMSS.ZS` | 20% |
+| Drinking water | WHO/UNICEF JMP via World Bank WDI | basic `SH.H2O.BASW.ZS` + safely managed `SH.H2O.SMDW.ZS` | 25% |
+| Sanitation | WHO/UNICEF JMP via World Bank WDI | basic `SH.STA.BASS.ZS` + safely managed `SH.STA.SMSS.ZS` | 20% |
 | Electricity | World Bank / Tracking SDG7 via WDI | `EG.ELC.ACCS.ZS` | 20% |
 | Internet | ITU via World Bank WDI | `IT.NET.USER.ZS` | 15% |
 | Health | WHO via World Bank WDI | `SH.UHC.SRVS.CV.XD` | 20% |
 
-For water and sanitation, Phase 3 uses `SH.H2O.BASW.ZS` and `SH.STA.BASS.ZS` as explicit fallbacks when safely managed service is unavailable. These fallbacks are capped and reliability-downweighted because "at least basic" is not equivalent to "safely managed".
+For water and sanitation, **at-least-basic access is the foundation and safely-managed access is the stricter quality/reliability layer**. They are nested standards, not interchangeable alternatives. When both are observed, the pillar combines 65% basic-access score and 35% safely-managed score. If only basic access is available, its score is retained at 0.90 evidence reliability; if only safely-managed access is available, it is retained at 0.80 reliability. Missing one measure therefore reduces evidence coverage rather than turning the missing dimension into a zero.
+
+This Phase 7.1 correction avoids the earlier pathology where a country could have near-universal basic water or sanitation access but receive a near-zero Basic Comfort pillar simply because the stricter safely-managed percentage was much lower.
 
 ## Saturating service scores
 
@@ -34,7 +36,7 @@ Each pillar is mapped to 0–1 using a floor and a target:
 | Internet | 35 | 90 |
 | UHC | 40 | 80 |
 
-Below the floor the pillar score is zero. At the target and above it is one.
+Below the floor the underlying service score is zero. At the target and above it is one.
 
 This is deliberate. The model is intended to detect whether a destination clears a useful modern baseline, not to continuously reward already-developed countries. A country with 99% versus 97% electricity access should not receive a meaningful additional value bonus once both have effectively cleared the floor.
 
@@ -60,22 +62,25 @@ At zero, Basic Comfort does not penalize ranking.
 
 As the slider rises:
 
-- the required comfort threshold rises from 55 toward 90;
-- the shortfall penalty becomes stronger;
-- destinations already above the threshold receive no additional bonus.
+- the required comfort threshold rises smoothly from **60 toward 85**;
+- shortfall convexity increases only modestly rather than steepening sharply;
+- destinations already above the selected threshold receive no additional bonus;
+- direct-data coverage controls how much penalty authority the dimension has.
 
-The function is therefore mainly a penalty/threshold system rather than a rich-country reward.
+Basic Comfort remains intentionally stronger than the partial Service Depth and WGI Stability proxies. At maximum concern, genuinely poor basic-service foundations can still receive a severe penalty. The smoother 60→85 curve is designed to prevent ordinary preference adjustments from creating unnecessary cliff effects while preserving that substantive distinction.
 
-## Ranking order
+## Current production ranking order
 
-Production ranking is now built in this order:
+Under Phase 7.1 the country ranking is built in this order:
 
-1. structural model score without the legacy GDP comfort floor;
-2. Phase 3 Basic Comfort penalty;
-3. Phase 2 bilateral FX Opportunity overlay;
-4. final normalized Quality-Adjusted Value.
+1. origin-relative Structural Purchasing Power;
+2. Basic Comfort shortfall penalty;
+3. bounded Service Depth shortfall penalty;
+4. bounded WGI Political Stability shortfall penalty;
+5. bounded bilateral FX Opportunity overlay;
+6. final normalized Quality-Adjusted Value.
 
-This prevents an unusually favorable currency move from overwhelming a destination that fails the user's selected basic-comfort requirement.
+The legacy GDP-led score is audit-only and does not determine ranking or country inclusion.
 
 ## Audit fields
 
@@ -97,4 +102,4 @@ The service data are national averages. They can miss large differences between 
 
 Electricity access does not measure outage frequency. Internet use does not measure connection speed, latency or reliability. UHC coverage does not directly measure traveller access, private-hospital quality or insurance availability.
 
-These are therefore basic-service floor indicators, not a complete quality-of-life index. City intelligence, amenity depth, mobility and digital convenience remain later phases.
+These are therefore basic-service floor indicators, not a complete quality-of-life index. City intelligence, amenity depth, mobility and digital convenience remain separate evidence layers.
