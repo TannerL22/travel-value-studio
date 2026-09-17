@@ -210,7 +210,7 @@ export default function Home() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">Global Rankings</p>
             <h1 className="mt-2 text-2xl font-semibold text-white">Where Your Money Buys More Life</h1>
             <p className="mt-2 max-w-2xl text-sm text-zinc-500">
-              Broad purchasing power adjusted by the current model's comfort, service-depth, and stability proxies. Destination costs only; travel-to-destination costs are outside scope.
+              Broad purchasing power adjusted by current comfort, service-depth, and stability proxies. Destination costs only; travel-to-destination costs are outside scope.
             </p>
           </div>
           <div className="flex items-center gap-4">
